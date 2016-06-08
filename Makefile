@@ -1,20 +1,25 @@
 CC?=gcc
-#CC=i686-w64-mingw32-gcc
+#CC=mingw-w64-x86_64-gcc
 #CC=clang
 
-SRC=$(wildcard *.c)
-OBJS=$(SRC:*.c=.o)
+SRC=$(wildcard src/*.c)
+OBJS=$(SRC:.c=.o)
 
-CFLAGS=-std=c99 -O2 -g -Wall
+CFLAGS=-std=c99 -O2 -Wall
+INCS=-Iinc
 LIBS=-lSDL2 -lSDL2_image -lSDL2_ttf
 OUTPUT=stage9
+
+ifeq ($(OS),Windows_NT)
+	LIBS := -lmingw32 -lSDL2main $(LIBS)
+endif
 
 all: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(OUTPUT) $(LIBS)
 
 %.o: %.c
-	$(CC) -c $(CFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(INCS) -o $@ $<
 	
 clean:
-	rm *.o
+	rm src/*.o
 	rm $(OUTPUT)

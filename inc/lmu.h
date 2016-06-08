@@ -7,8 +7,8 @@
  * Import/Export for RPG Maker 2000/2003 LMU format
  */
 
-S9File* lmu_import(const char *filename);
+S9MapFile* lmu_import(const char *filename);
 
-void lmu_export(const char *filename, S9File *s9layout);
+void lmu_export(const char *filename, S9MapFile *s9layout);
 
 #endif

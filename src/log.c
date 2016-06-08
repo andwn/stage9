@@ -18,7 +18,7 @@ char *levelStr[7] = {
 void lopen(const char *filename) {
 	logfile = fopen(filename, "w");
 	if(logfile == NULL) {
-		printf(ERROR, "Unable to create log \"%s\".\n", filename);
+		printf("Unable to create log \"%s\".\n", filename);
 	}
 }
 
