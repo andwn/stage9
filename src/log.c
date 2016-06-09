@@ -18,13 +18,13 @@ char *levelStr[7] = {
 void lopen(const char *filename) {
 	logfile = fopen(filename, "w");
 	if(logfile == NULL) {
-		printf("Unable to create log \"%s\".\n", filename);
+		lprintf(ERROR, "Unable to create log \"%s\".\n", filename);
 	}
 }
 
 void lclose() {
 	if(logfile == NULL) {
-		printf("Called lclose() but no log file is open.\n");
+		lprintf(WARN, "Called lclose() but no log file is open.\n");
 	} else {
 		lprintf(TRACE, "Closing log file.\n");
 		fclose(logfile);
@@ -32,10 +32,21 @@ void lclose() {
 }
 
 void lprintf(int level, const char *format, ...) {
-	if(logfile == NULL || logLevel > level) return;
-	fprintf(logfile, "%s ", levelStr[level]);
+	if(logLevel > level) return;
+	// Print to file
+	if(logfile != NULL) {
+		fprintf(logfile, "%s ", levelStr[level]);
+		va_list args;
+		va_start(args, format);
+		vfprintf(logfile, format, args);
+		va_end(args);
+		fprintf(logfile, "\n");
+	}
+	// Print to console output
+	printf("%s ", levelStr[level]);
 	va_list args;
 	va_start(args, format);
-	vfprintf(logfile, format, args);
+	vprintf(format, args);
 	va_end(args);
+	printf("\n");
 }

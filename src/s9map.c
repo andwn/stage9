@@ -37,7 +37,8 @@ S9Map* s9map_open(const char *filename) {
 	s9m->name = calloc(1, s9m->nameLen);
 	fread(&s9m->name, 1, s9m->nameLen, file);
 	// Width, Height
-	fread(&s9m->layoutWidth, 2, 2, file);
+	fread(&s9m->layoutWidth, 2, 1, file);
+	fread(&s9m->layoutHeight, 2, 1, file);
 	// Total size in memory, doubled if there is an upper layer
 	int tsize = s9m->layoutWidth * s9m->layoutHeight * ((s9m->flags & S9M_UPPERLAYER) ? 2 : 1);
 	s9m->tiles = calloc(2, tsize);

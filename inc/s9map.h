@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+#define S9M_VERSION 1
+
 #define S9M_UPPERLAYER	1
 #define S9M_USEPLANA	2
 #define S9M_BYTETILES	4

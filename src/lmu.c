@@ -4,26 +4,32 @@
 #include <stdio.h>
 #include "log.h"
 
+// See: https://github.com/EasyRPG/liblcf/blob/master/src/generated/lmu_map.cpp
+
 S9Map* lmu_import(const char *filename) {
 	FILE *lmu;
 	S9Map *s9m;
 	u16 tile;
+	char buf;
 	int offset;
 	
 	lmu = fopen(filename, "rb");
 	s9m = calloc(sizeof(S9Map), 1);
 	s9m->version = S9M_VERSION;
 	s9m->flags |= S9M_UPPERLAYER;
-	// Map size - height then width, 4 byte ints
-    fseek(lmu, 12, SEEK_SET);
-    fread(&s9m->layoutHeight, 1, 2, lmu);
-    fseek(lmu, 2, SEEK_CUR);
+	// Map size - 4 byte ints
+    fseek(lmu, 10 + 2, SEEK_SET);
     fread(&s9m->layoutWidth, 1, 2, lmu);
+    fseek(lmu, 2, SEEK_CUR);
+    fread(&s9m->layoutHeight, 1, 2, lmu);
     // Allocate the tiles array now that we know the size
     s9m->tiles = calloc(2, s9m->layoutWidth * s9m->layoutHeight * 2);
+    // Parallax flag
+    //fread(&buf, 1, 1, lmu);
+    //if(buf) s9m->flags |= S9M_USEPLANA;
     // There is a string or something I assume here which always ends with '>'
     // Exactly 40 bytes after is where the tilemap starts
-    for(char buf = '!'; buf != '>'; fread(&buf, 1, 1, lmu));
+    for(buf = '!'; buf != '>'; fread(&buf, 1, 1, lmu));
     offset = ftell(lmu);
     fseek(lmu, offset + 40, SEEK_SET);
 	// The tiles
