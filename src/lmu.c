@@ -4,45 +4,49 @@
 #include <stdio.h>
 #include "log.h"
 
-S9MapFile* lmu_import(const char *filename) {
+S9Map* lmu_import(const char *filename) {
 	FILE *lmu;
-	S9MapFile *s9layout;
+	S9Map *s9m;
 	u16 tile;
 	int offset;
 	
 	lmu = fopen(filename, "rb");
-	s9layout = calloc(sizeof(S9MapFile), 0);
+	s9m = calloc(sizeof(S9Map), 1);
+	s9m->version = S9M_VERSION;
+	s9m->flags |= S9M_UPPERLAYER;
 	// Map size - height then width, 4 byte ints
     fseek(lmu, 12, SEEK_SET);
-    fread(&s9layout->layoutHeight, 1, 2, lmu);
+    fread(&s9m->layoutHeight, 1, 2, lmu);
     fseek(lmu, 2, SEEK_CUR);
-    fread(&s9layout->layoutWidth, 1, 2, lmu);
+    fread(&s9m->layoutWidth, 1, 2, lmu);
     // Allocate the tiles array now that we know the size
-    s9layout->tiles = calloc(s9layout->layoutWidth * s9layout->layoutHeight, 0);
+    s9m->tiles = calloc(2, s9m->layoutWidth * s9m->layoutHeight * 2);
     // There is a string or something I assume here which always ends with '>'
     // Exactly 40 bytes after is where the tilemap starts
     for(char buf = '!'; buf != '>'; fread(&buf, 1, 1, lmu));
     offset = ftell(lmu);
     fseek(lmu, offset + 40, SEEK_SET);
 	// The tiles
-    for(u16 x = 0; x < s9layout->layoutWidth; x++) {
-        for(u16 y = 0; y < s9layout->layoutHeight; y++) {
-            fread(&tile, 1, 2, lmu);
+    for(u16 x = 0; x < s9m->layoutWidth; x++) {
+        for(u16 y = 0; y < s9m->layoutHeight; y++) {
+            fread(&tile, 2, 1, lmu);
             tile %= 1000;
-			if(tile >= 256) {
-				lprintf(WARN, "LMU tile index can't fit in a byte: %hu\n", tile);
-			}
-			s9layout->tiles[y * s9layout->layoutWidth + x] = tile;
+			//if(tile >= 256) {
+			//	lprintf(TRACE, "LMU tile index can't fit in a byte: %hu\n", tile);
+			//}
+			s9m->tiles[y * s9m->layoutWidth + x] = tile;
 			fseek(lmu, 2, SEEK_CUR);
 		}
 	}
-	// This is another layer, probably
-	for(u16 x = 0; x < s9layout->layoutWidth; x++) {
-        for(u16 y = 0; y < s9layout->layoutHeight; y++) {
-			fread(&tile, 1, 2, lmu);
-			// Hi
+	// This is the upper layer
+	int l = s9m->layoutWidth * s9m->layoutHeight; // Start of layer index
+	for(u16 x = 0; x < s9m->layoutWidth; x++) {
+        for(u16 y = 0; y < s9m->layoutHeight; y++) {
+			fread(&tile, 2, 1, lmu);
+			tile %= 1000;
+			s9m->tiles[l + y * s9m->layoutWidth + x] = tile;
 		}
     }
 	fclose(lmu);
-	return s9layout;
+	return s9m;
 }
