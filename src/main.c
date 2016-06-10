@@ -9,6 +9,8 @@
 #include "dialog.h"
 #include "graphics.h"
 
+#define map_tile(x, y) (map->tiles[(x) + (y) * map->layoutWidth])
+
 // Interface sizes
 #define BORDER_SIZE	2
 
@@ -22,25 +24,31 @@
 #define MAP_W		640
 #define MAP_H		448
 
-#define MINIMAP_X	(MAP_X + MAP_W + BORDER_SIZE)
-#define MINIMAP_Y	(TOOLBAR_Y + TOOLBAR_H + BORDER_SIZE)
-#define MINIMAP_W	128
-#define MINIMAP_H	96
-
 #define TILESET_X	(MAP_X + MAP_W + BORDER_SIZE)
-#define TILESET_Y	(MINIMAP_Y + MINIMAP_H + BORDER_SIZE)
+#define TILESET_Y	(TOOLBAR_Y + TOOLBAR_H + BORDER_SIZE)
 #define TILESET_W	128
-#define TILESET_H	384
+#define TILESET_H	MAP_H
 
-#define MLEFT 	SDL_BUTTON_LEFT
-#define MRIGHT 	6 // SDL_BUTTON_RIGHT is the middle mouse button... yeah
+// Interface / Selection values
+#define MAP_SCROLL_SPEED 4
 
-#define mouse_left_pressed() (mstate & MLEFT)
-#define mouse_left_released() (omstate & MLEFT && !(mstate & MLEFT))
-#define mouse_right_pressed() (mstate & MRIGHT)
-#define mouse_right_released() (omstate & MRIGHT && !(mstate & MRIGHT))
+int mapCamX = 0, mapCamY = 0;
+int mapHoverX = -1, mapHoverY = -1;
+int tsScrollY = 0;
+int tsSelected = 0, tsHover = -1;
 
 // Input
+#define MLEFT 	SDL_BUTTON_LEFT
+#define MRIGHT 	SDL_BUTTON_RIGHT
+
+#define mouse_left_pressed() (mstate & MLEFT && !(omstate & MLEFT))
+#define mouse_left_down() (mstate & MLEFT)
+#define mouse_left_released() (omstate & MLEFT && !(mstate & MLEFT))
+#define mouse_right_pressed() (mstate & MRIGHT && !(omstate & MRIGHT))
+#define mouse_right_down() (mstate & MRIGHT)
+#define mouse_right_released() (omstate & MRIGHT && !(mstate & MRIGHT))
+#define mouse_within(x1, y1, x2, y2) (mousex > x1 && mousex < x2 && mousey > y1 && mousey < y2)
+
 u32 mstate = 0, omstate;
 int mousex = 0, mousey = 0;
 
@@ -53,15 +61,6 @@ S9TileOpFile *tsProp = NULL;
 // Map
 char *mapFilename = NULL;
 S9Map *map = NULL;
-
-// Interface
-int mapCamX = 0, mapCamY = 0;
-int tsScrollY = 0;
-int selectedTile = 0;
-
-void draw_toolbar() {
-	
-}
 
 void draw_map() {
 	if(map == NULL) {
@@ -107,15 +106,44 @@ void draw_map() {
 	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 }
 
-void draw_minimap() {
-	
-}
-
 void draw_tileset() {
 	if(tsTexture == NULL) {
 		graphics_draw_text("No Tileset Loaded", TILESET_X + 32, TILESET_Y + 32, COLOR_WHITE);
 		return;
 	}
+	// The tileset could be any size, so wrap it to fit into the tileset area
+	int columns = TILESET_W / TILE_SIZE;
+	int firstTile = tsScrollY / TILE_SIZE * columns;
+	int lastTile = firstTile + TILESET_H / TILE_SIZE * columns;
+	// Source cursor that is moved left to right up to down on the tileset texture
+	int sx = (firstTile % tsProp->tilesetWidth) * TILE_SIZE;
+	int sy = (firstTile / tsProp->tilesetWidth) * TILE_SIZE;
+	// When halfway scrolled betweet rows need to draw an extra one
+	if(tsScrollY % TILE_SIZE != 0) lastTile += columns;
+	for(int i = firstTile; i < lastTile; i++) {
+		draw_tile(tsTexture, sx, sy, 
+			TILESET_X + ((i % columns) * TILE_SIZE), 
+			TILESET_Y + (i / columns * TILE_SIZE),
+			TILE_SIZE, TILE_SIZE);
+		if(i == tsHover || i == tsSelected) {
+			draw_rect(TILESET_X + ((i % columns) * TILE_SIZE), 
+				TILESET_Y + (i / columns * TILE_SIZE), TILE_SIZE, TILE_SIZE);
+		}
+		// Move source cursor in tileset texture to next tile
+		sx += TILE_SIZE;
+		if(sx / TILE_SIZE >= tsProp->tilesetWidth) {
+			sx = 0;
+			sy += TILE_SIZE;
+			if(sy / TILE_SIZE >= tsProp->tilesetHeight) break;
+		}
+	}
+}
+
+void draw_border() {
+	
+}
+
+void draw_toolbar() {
 	
 }
 
@@ -136,33 +164,61 @@ int main(int argc, char *argv[]) {
 	tsProp->tilesetHeight = 256 / 16;
 	bool running = true;
 	while(running) {
+		// Mouse state
+		omstate = mstate;
+		mstate = SDL_GetMouseState(&mousex, &mousey);
 		// Poll input - do things when the user presses stuff
 		SDL_Event event;
 		while(SDL_PollEvent(&event)) {
 			if(event.type == SDL_QUIT) {
 				running = false;
 				break;
-			} /*else if(event.type == SDL_KEYDOWN) {
+			} else if(event.type == SDL_KEYDOWN) {
 				int key = event.key.keysym.sym;
 				if(key == SDLK_LEFT) {
-					
+					mapCamX -= MAP_SCROLL_SPEED;
 				} else if(key == SDLK_UP) {
-					
+					mapCamY -= MAP_SCROLL_SPEED;
 				} else if(key == SDLK_RIGHT) {
-					
+					mapCamX += MAP_SCROLL_SPEED;
 				} else if(key == SDLK_DOWN) {
-					
+					mapCamY += MAP_SCROLL_SPEED;
 				}
-			}*/
+				if(map != NULL) {
+					if(mapCamX > map->layoutWidth * TILE_SIZE - MAP_W)
+						mapCamX = map->layoutWidth * TILE_SIZE - MAP_W;
+					if(mapCamY > map->layoutHeight * TILE_SIZE - MAP_H)
+						mapCamY = map->layoutHeight * TILE_SIZE - MAP_H;
+					if(mapCamX < 0 || map->layoutWidth <= 40) mapCamX = 0;
+					if(mapCamY < 0 || map->layoutHeight <= 28) mapCamY = 0;
+				}
+			}
 		}
-		// Mouse state
-		omstate = mstate;
-		mstate = SDL_GetMouseState(&mousex, &mousey);
+		// Update mouse stuff
+		mapHoverX = mapHoverY = tsHover = -1;
+		if(mouse_within(MAP_X, MAP_Y, MAP_X + MAP_W, MAP_Y + MAP_H)) {
+			// Get the map tile x and y underneath the mouse
+			mapHoverX = (mousex - MAP_X + mapCamX) / TILE_SIZE; 
+			mapHoverY = (mousey - MAP_Y + mapCamY) / TILE_SIZE;
+			if(mouse_left_down()) { // Draw tile
+				map_tile(mapHoverX, mapHoverY) = tsSelected;
+			} else if(mouse_right_down()) { // Erase
+				map_tile(mapHoverX, mapHoverY) = 0;
+			}
+		} else if(mouse_within(TILESET_X, TILESET_Y, TILESET_X+TILESET_W, TILESET_Y+TILESET_H)) {
+			// Get which tile in the tileset is underneath the mouse
+			u16 mx = (mousex - TILESET_X) / TILE_SIZE, 
+				my = (mousey - TILESET_Y + tsScrollY) / TILE_SIZE;
+			tsHover = mx + my * (TILESET_W / TILE_SIZE);
+			if(mouse_left_down()) { // Select hovering tile
+				tsSelected = tsHover;
+			}
+		}
 		// Draw
-		draw_toolbar();
 		draw_map();
-		draw_minimap();
 		draw_tileset();
+		draw_border();
+		draw_toolbar();
 		graphics_present();
 	}
 	graphics_close();

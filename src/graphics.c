@@ -18,8 +18,8 @@ void graphics_init() {
 	lprintf(DEBUG, "Creating Renderer");
 	init((renderer = SDL_CreateRenderer(window, -1, REND_OPS)) == NULL, SDL_GetError);
 	// Load font
-	//lprintf(DEBUG, "Loading font.png");
-	//init((font = load_texture("font.png")) == NULL, SDL_GetError);
+	lprintf(DEBUG, "Loading font.png");
+	init((font = graphics_load_texture("font.png")) == NULL, SDL_GetError);
 	// Alpha blending
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	frameTime = SDL_GetTicks();
