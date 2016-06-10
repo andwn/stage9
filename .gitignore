@@ -1,0 +1,5 @@
+log.txt
+stage9
+*.o
+src/*.o
+

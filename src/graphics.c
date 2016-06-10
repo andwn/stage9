@@ -1,6 +1,9 @@
 #include "graphics.h"
 #include "log.h"
 
+u64 frameTime;
+SDL_Texture *font;
+
 void graphics_init() {
 	// Init SDL, don't need audio or network
 	lprintf(DEBUG, "Initializing SDL");
@@ -22,8 +25,41 @@ void graphics_init() {
 	frameTime = SDL_GetTicks();
 }
 
+SDL_Texture* graphics_load_texture(const char *filename) {
+	lprintf(DEBUG, "Loading texture: %s", filename);
+	SDL_Surface *surface = IMG_Load(filename);
+	if(surface == NULL) {
+		lprintf(ERROR, SDL_GetError());
+		return NULL;
+	}
+	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+	SDL_FreeSurface(surface);
+	return texture;
+}
+
+void graphics_draw_text(const char *text, int x, int y, SDL_Color color) {
+	int i, line = 0;
+	SDL_Rect srect = {0, 0, FONT_SIZE_X, FONT_SIZE_Y}, 
+		drect = {x, y, FONT_SIZE_X, FONT_SIZE_Y};
+	SDL_SetTextureAlphaMod(font, color.a);
+	for(i = 0; text[i] != '\0'; i++) {
+		if(text[i] > 0x20) {
+			drect.x = x + FONT_SIZE_X * (i - line);
+			srect.x = ((text[i] - 0x20) % FONT_COLS) * FONT_SIZE_X;
+			srect.y = ((text[i] - 0x20) / FONT_COLS) * FONT_SIZE_Y;
+			SDL_SetTextureColorMod(font, color.r, color.g, color.b);
+			SDL_RenderCopy(renderer, font, &srect, &drect);
+		} else if(text[i] == '\n') {
+			drect.x = x;
+			drect.y += FONT_SIZE_Y;
+			line = i + 1;
+		}
+	}
+}
+
 void graphics_present() {
-	SDL_Delay(1000 / 60 - SDL_GetTicks() + frameTime);
+	int delay = 1000 / 60 - SDL_GetTicks() + frameTime;
+	if(delay > 0) SDL_Delay(delay);
 	frameTime = SDL_GetTicks();
 	SDL_RenderPresent(renderer);
 	SDL_SetRenderDrawColor(renderer, 0x22, 0x22, 0x22, 0xFF);

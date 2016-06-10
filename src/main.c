@@ -47,75 +47,50 @@ int mousex = 0, mousey = 0;
 // Tileset
 char *tsFilename = NULL;
 SDL_Texture *tsTexture = NULL;
-char *tsOpFilename = NULL;
-S9TileOpFile *tsOpFile = NULL;
+char *tsPropFilename = NULL;
+S9TileOpFile *tsProp = NULL;
 
 // Map
 char *mapFilename = NULL;
-S9Map *mapFile = NULL;
+S9Map *map = NULL;
 
 // Interface
 int mapCamX = 0, mapCamY = 0;
 int tsScrollY = 0;
 int selectedTile = 0;
 
-SDL_Texture* load_texture(const char *filename) {
-	SDL_Surface *surface = IMG_Load(filename);
-	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-	SDL_FreeSurface(surface);
-	return texture;
-}
-
-void draw_text(const char *text, int x, int y, SDL_Color color) {
-	int i, line = 0;
-	SDL_Rect srect = {0, 0, FONT_SIZE_X, FONT_SIZE_Y}, 
-		drect = {x, y, FONT_SIZE_X, FONT_SIZE_Y};
-	SDL_SetTextureAlphaMod(font, color.a);
-	for(i = 0; text[i] != '\0'; i++) {
-		if(text[i] > 0x20) {
-			drect.x = x + FONT_SIZE_X * (i - line);
-			srect.x = ((text[i] - 0x20) % FONT_COLS) * FONT_SIZE_X;
-			srect.y = ((text[i] - 0x20) / FONT_COLS) * FONT_SIZE_Y;
-			SDL_SetTextureColorMod(font, color.r, color.g, color.b);
-			SDL_RenderCopy(renderer, font, &srect, &drect);
-		} else if(text[i] == '\n') {
-			drect.x = x;
-			drect.y += FONT_SIZE_Y;
-			line = i + 1;
-		}
-	}
-}
-
 void draw_toolbar() {
 	
 }
 
 void draw_map() {
-	if(mapFile == NULL) {
-		draw_text("No Map Loaded", MAP_X + 32, MAP_Y + 32, COLOR_WHITE);
+	if(map == NULL) {
+		graphics_draw_text("No Map Loaded", MAP_X + 32, MAP_Y + 32, COLOR_WHITE);
 		return;
 	}
+	//lprintf(TRACE, "Drawing map tiles");
 	// Draw map tiles
 	int bx = mapCamX / TILE_SIZE, by = mapCamY / TILE_SIZE,
 		bw = MAP_W / TILE_SIZE, bh = MAP_H / TILE_SIZE;
 	if(mapCamX % TILE_SIZE != 0) bw++;
 	if(mapCamY % TILE_SIZE != 0) bh++;
-	for(int y = by; y < bh && y < mapFile->layoutHeight && y < by + bw; y++) {
-		for(int x = bx; x < bw && x < mapFile->layoutWidth && x < by + bw; x++) {
+	for(int y = by; y < bh && y < map->layoutHeight && y < by + bw; y++) {
+		for(int x = bx; x < bw && x < map->layoutWidth && x < by + bw; x++) {
+			//lprintf(TRACE, "Tile at index: %d, %d", x, y);
 			// Tileset index for this map tile
-			u16 ind = mapFile->tiles[y * mapFile->layoutWidth + x];
+			u16 ind = map->tiles[y * map->layoutWidth + x];
 			// Where to draw it on the screen
 			int drawx = MAP_X + x * TILE_SIZE - (mapCamX % TILE_SIZE), 
 				drawy = MAP_Y + y * TILE_SIZE - (mapCamY % TILE_SIZE);
 			// If no tileset is loaded, draw the index number
 			if(tsTexture == NULL) {
-				//char str[8];
-				//sprintf(str, "%d", ind);
-				//draw_text(str, drawx + 1, drawy + 1, COLOR_WHITE);
+				char str[8];
+				sprintf(str, "%d", ind);
+				graphics_draw_text(str, drawx + 1, drawy + 1, COLOR_WHITE);
 			} else {
 				draw_tile(tsTexture, 
-					(ind % tsOpFile->tilesetWidth) * TILE_SIZE, 
-					(ind / tsOpFile->tilesetWidth) * TILE_SIZE,
+					(ind % tsProp->tilesetWidth) * TILE_SIZE, 
+					(ind / tsProp->tilesetWidth) * TILE_SIZE,
 					drawx, drawy, TILE_SIZE, TILE_SIZE
 				);
 			}
@@ -138,9 +113,10 @@ void draw_minimap() {
 
 void draw_tileset() {
 	if(tsTexture == NULL) {
-		//draw_text("No Tileset Loaded", TILESET_X + 32, TILESET_Y + 32, COLOR_WHITE);
+		graphics_draw_text("No Tileset Loaded", TILESET_X + 32, TILESET_Y + 32, COLOR_WHITE);
 		return;
 	}
+	
 }
 
 int main(int argc, char *argv[]) {
@@ -151,24 +127,22 @@ int main(int argc, char *argv[]) {
 	// Graphics
 	graphics_init();
 	// Load empty map
-	mapFile = lmu_import("sample/madoroom.lmu");
-	//mapFile = calloc(sizeof(S9Map), 1);
-	//mapFile->version = S9M_VERSION;
-	//mapFile->name = calloc(1, sizeof("Untitled"));
-	//sprintf(mapFile->name, "Untitled");
-	//mapFile->layoutWidth = 40;
-	//mapFile->layoutHeight = 28;
-	//mapFile->tiles = calloc(2, mapFile->layoutWidth * mapFile->layoutHeight);
+	//map = lmu_import("sample/mado.lmu");
+	map = map_create("Untitled", 40, 28);
+	tsTexture = graphics_load_texture("sample/main.png");
+	//tsProp = tileprop_new_from_texture(tsTexture);
+	tsProp = calloc(sizeof(S9TileOpFile), 1);
+	tsProp->tilesetWidth = 480 / 16;
+	tsProp->tilesetHeight = 256 / 16;
 	bool running = true;
 	while(running) {
 		// Poll input - do things when the user presses stuff
 		SDL_Event event;
 		while(SDL_PollEvent(&event)) {
 			if(event.type == SDL_QUIT) {
-				printf("fuc");
 				running = false;
 				break;
-			} else if(event.type == SDL_KEYDOWN) {
+			} /*else if(event.type == SDL_KEYDOWN) {
 				int key = event.key.keysym.sym;
 				if(key == SDLK_LEFT) {
 					
@@ -179,7 +153,7 @@ int main(int argc, char *argv[]) {
 				} else if(key == SDLK_DOWN) {
 					
 				}
-			}
+			}*/
 		}
 		// Mouse state
 		omstate = mstate;

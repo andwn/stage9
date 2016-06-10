@@ -6,6 +6,7 @@
 
 /*
  * Import/Export for RPG Maker 2000/2003 LMU format
+ * This doesn't work yet because I have to figure out how to unencode this garbage
  */
 
 S9Map* lmu_import(const char *filename);

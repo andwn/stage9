@@ -21,4 +21,10 @@ struct S9Map {
 	u16 *tiles;
 };
 
+S9Map* map_create(const char *name, u16 width, u16 height);
+
+void map_save(const char *filename, S9Map *s9m);
+
+S9Map* map_open(const char *filename);
+
 #endif

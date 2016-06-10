@@ -2,8 +2,23 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "log.h"
 
-void s9map_save(const char *filename, S9Map *s9m) {
+S9Map* map_create(const char *name, u16 width, u16 height) {
+	lprintf(DEBUG, "Creating new map \"%s\" - %hu, %hu", name, width, height);
+	S9Map *map = calloc(sizeof(S9Map), 1);
+	map->version = S9M_VERSION;
+	map->nameLen = strlen(name);
+	map->name = calloc(1, strlen(name));
+	sprintf(map->name, name);
+	map->layoutWidth = width;
+	map->layoutHeight = height;
+	map->tiles = calloc(2, width * height);
+	return map;
+}
+
+void map_save(const char *filename, S9Map *s9m) {
 	FILE *file = fopen(filename, "wb");
 	// Version
 	fwrite(&s9m->version, 2, 1, file);
@@ -25,7 +40,7 @@ void s9map_save(const char *filename, S9Map *s9m) {
 	fclose(file);
 }
 
-S9Map* s9map_open(const char *filename) {
+S9Map* map_open(const char *filename) {
 	FILE *file = fopen(filename, "rb");
 	S9Map *s9m = calloc(1, sizeof(S9Map));
 	// Version

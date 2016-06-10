@@ -40,10 +40,12 @@
 
 SDL_Window *window;
 SDL_Renderer *renderer;
-u64 frameTime;
-SDL_Texture *font = NULL;
 
 void graphics_init();
+
+SDL_Texture* graphics_load_texture(const char *filename);
+
+void graphics_draw_text(const char *text, int x, int y, SDL_Color color);
 
 void graphics_present();
 
