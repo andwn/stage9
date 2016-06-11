@@ -4,22 +4,21 @@
 #include "common.h"
 
 /**
- * Launches a GTK file chooser to select a map file to open
+ * File chooser dialogs
  * Returns the filename selected or NULL if it was cancelled
  */
-char* dialog_open_map();
+char* dialog_map_open(const char *defaultFilename);
 
-char* dialog_open_tileset();
+char* dialog_tileset_open(const char *defaultFilename);
 
-char* dialog_open_tileprop();
+char* dialog_tileattr_open(const char *defaultFilename);
+
+char* dialog_map_save(const char *defaultFilename);
+
+char* dialog_tileattr_save(const char *defaultFilename);
 
 /**
- * Launches a GTK file chooser to select where to save the map
- * Parameter is the starting location (Save As), or null for OS default
- * Returns the filename selected or NULL if it was cancelled
+ * Other windows go here eventually, like map properties and tile attribute edit
  */
-char* dialog_save_map(const char *defaultFilename);
-
-char* dialog_save_tileprop();
 
 #endif

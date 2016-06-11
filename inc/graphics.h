@@ -5,8 +5,8 @@
 #include <SDL2/SDL_image.h>
 #include "common.h"
 
-#define WIN_W		1024
-#define WIN_H		768
+#define WIN_W		800
+#define WIN_H		600
 #define REND_OPS	SDL_RENDERER_PRESENTVSYNC
 
 #define FONT_SIZE_X	5

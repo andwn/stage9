@@ -27,4 +27,6 @@ void map_save(const char *filename, S9Map *s9m);
 
 S9Map* map_open(const char *filename);
 
+void map_free(S9Map *map);
+
 #endif

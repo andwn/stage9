@@ -62,7 +62,7 @@ void graphics_present() {
 	if(delay > 0) SDL_Delay(delay);
 	frameTime = SDL_GetTicks();
 	SDL_RenderPresent(renderer);
-	SDL_SetRenderDrawColor(renderer, 0x22, 0x22, 0x22, 0xFF);
+	SDL_SetRenderDrawColor(renderer, 0x33, 0x22, 0x44, 0xFF);
 	SDL_RenderClear(renderer);
 	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 }

@@ -64,3 +64,9 @@ S9Map* map_open(const char *filename) {
 	fclose(file);
 	return s9m;
 }
+
+void map_free(S9Map *map) {
+	free(map->tiles);
+	free(map->name);
+	free(map);
+}
