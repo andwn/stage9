@@ -57,15 +57,13 @@
 #define MAP_SCROLL_SPEED 4
 
 // Menu
-#define MENU_COUNT			6
+#define MENU_COUNT			4
 #define MENU_MAXITEMCOUNT	6
 #define MENU_MAXLABELSIZE	32
 enum { 
 	MENU_MAP, 
 	MENU_TSET,
 	MENU_ATTR,
-	MENU_VIEW,
-	MENU_TOOL,
 	MENU_HELP
 };
 enum { 
@@ -87,30 +85,19 @@ enum {
 	MENU_ATTR_EDIT 
 };
 enum {
-	MENU_VIEW_SHOWGRID,
-	MENU_VIEW_TILEATTR,
-	MENU_VIEW_LOWERLAYER,
-	MENU_VIEW_UPPERLAYER
-};
-enum {
-	MENU_TOOL_TSETOPT
-};
-enum {
 	MENU_HELP_MANUAL,
 	MENU_HELP_GITHUB,
 	MENU_HELP_ABOUT
 };
-const u8 menuItemCount[MENU_COUNT] = { 6, 2, 4, 4, 1, 3 };
+const u8 menuItemCount[MENU_COUNT] = { 6, 2, 4, 3 };
 const char menu[MENU_COUNT][MENU_MAXITEMCOUNT + 1][MENU_MAXLABELSIZE] = {
 	{ "Map", "New", "Open", "Save", "SaveAs", "Properties", "Close" },
 	{ "Tileset", "Open", "Close" },
-	{ "Tile Attr", "Open", "Save", "SaveAs", "Edit" },
-	{ "View", "Show Grid", "Show Attributes", "Show Lower Layer", "Show Upper Layer" },
-	{ "Tools", "Optimize Tileset" },
+	{ "Tile Attributes", "Open", "Save", "SaveAs", "Edit" },
 	{ "Help", "Manual", "Github", "About" }
 };
-u8 menuGlow[MENU_COUNT] = { 0, 0, 0, 0, 0, 0 };
-u8 subMenuGlow[MENU_COUNT] = { 0, 0, 0, 0, 0, 0 };
+u8 menuGlow[MENU_COUNT] = { 0, 0, 0, 0 };
+u8 subMenuGlow[MENU_MAXITEMCOUNT] = { 0, 0, 0, 0, 0, 0 };
 
 // Input
 #define MLEFT 	SDL_BUTTON_LEFT
@@ -158,15 +145,21 @@ void do_menu_action(int menuIndex, int item) {
 		case MENU_MAP:
 		switch(item) {
 			case MENU_MAP_NEW: {
-				Map *newMap = map_create("Untitled", 40, 28);
-				if(newMap != NULL) {
-					if(map != NULL) map_free(map);
-					map = newMap;
-					if(mapFilename != NULL) {
-						free(mapFilename);
-						mapFilename = NULL;
+				MapDialogResult *result = dialog_map_edit(NULL);
+				if(!result->cancelled) {
+					Map *newMap = map_create(result->name, result->width, result->height,
+						result->upperLayer, result->planA, result->byteTiles,
+						result->wrapH, result->wrapV);
+					if(newMap != NULL) {
+						if(map != NULL) map_free(map);
+						map = newMap;
+						if(mapFilename != NULL) {
+							free(mapFilename);
+							mapFilename = NULL;
+						}
 					}
 				}
+				free(result);
 				break;
 			}
 			case MENU_MAP_OPEN: {
@@ -222,11 +215,13 @@ void do_menu_action(int menuIndex, int item) {
 				}
 			}
 			break;
+			case MENU_TSET_CLOSE:
+			SDL_DestroyTexture(tsTexture);
+			tsTexture = NULL;
+			break;
 		}
 		break;
 		case MENU_ATTR: break;
-		case MENU_VIEW: break;
-		case MENU_TOOL: break;
 		case MENU_HELP: 
 		switch(item) {
 			case MENU_HELP_MANUAL:
@@ -255,34 +250,29 @@ void do_menu_action(int menuIndex, int item) {
 }
 
 bool update_input() {
-	// Mouse state
-	omstate = mstate;
-	mstate = SDL_GetMouseState(&mousex, &mousey);
 	// Poll input - do things when the user presses stuff
 	SDL_Event event;
 	while(SDL_PollEvent(&event)) {
 		if(event.type == SDL_QUIT) {
 			return true;
-		} else if(event.type == SDL_KEYDOWN) {
-			int key = event.key.keysym.sym;
-			if(key == SDLK_LEFT) {
-				mapCamX -= MAP_SCROLL_SPEED;
-			} else if(key == SDLK_UP) {
-				mapCamY -= MAP_SCROLL_SPEED;
-			} else if(key == SDLK_RIGHT) {
-				mapCamX += MAP_SCROLL_SPEED;
-			} else if(key == SDLK_DOWN) {
-				mapCamY += MAP_SCROLL_SPEED;
-			}
-			if(map != NULL) { // Stay in bounds
-				if(mapCamX > map->width * TILE_SIZE - MAP_W)
-					mapCamX = map->width * TILE_SIZE - MAP_W;
-				if(mapCamY > map->height * TILE_SIZE - MAP_H)
-					mapCamY = map->height * TILE_SIZE - MAP_H;
-				if(mapCamX < 0 || map->width <= 40) mapCamX = 0;
-				if(mapCamY < 0 || map->height <= 28) mapCamY = 0;
-			}
 		}
+	}
+	// Mouse state
+	omstate = mstate;
+	mstate = SDL_GetMouseState(&mousex, &mousey);
+	// Keyboard
+	const u8 *key = SDL_GetKeyboardState(NULL);
+	if(key[SDL_SCANCODE_LEFT]) mapCamX -= MAP_SCROLL_SPEED;
+	if(key[SDL_SCANCODE_UP]) mapCamY -= MAP_SCROLL_SPEED;
+	if(key[SDL_SCANCODE_RIGHT]) mapCamX += MAP_SCROLL_SPEED;
+	if(key[SDL_SCANCODE_DOWN]) mapCamY += MAP_SCROLL_SPEED;
+	if(map != NULL) { // Stay in bounds
+		if(mapCamX > map->width * TILE_SIZE - MAP_W)
+			mapCamX = map->width * TILE_SIZE - MAP_W;
+		if(mapCamY > map->height * TILE_SIZE - MAP_H)
+			mapCamY = map->height * TILE_SIZE - MAP_H;
+		if(mapCamX < 0 || map->width <= 40) mapCamX = 0;
+		if(mapCamY < 0 || map->height <= 28) mapCamY = 0;
 	}
 	return false;
 }
@@ -352,14 +342,14 @@ void draw_map() {
 		bw = MAP_W / TILE_SIZE, bh = MAP_H / TILE_SIZE;
 	if(mapCamX % TILE_SIZE != 0) bw++;
 	if(mapCamY % TILE_SIZE != 0) bh++;
-	for(int y = by; y < bh && y < map->height && y < by + bw; y++) {
-		for(int x = bx; x < bw && x < map->width && x < by + bw; x++) {
+	for(int y = by; y < by + bh && y < map->height; y++) {
+		for(int x = bx; x < bx + bw && x < map->width; x++) {
 			//lprintf(TRACE, "Tile at index: %d, %d", x, y);
 			// Tileset index for this map tile
 			u16 ind = map->tiles[y * map->width + x];
 			// Where to draw it on the screen
-			int drawx = MAP_X + x * TILE_SIZE - (mapCamX % TILE_SIZE), 
-				drawy = MAP_Y + y * TILE_SIZE - (mapCamY % TILE_SIZE);
+			int drawx = MAP_X + x * TILE_SIZE - mapCamX, 
+				drawy = MAP_Y + y * TILE_SIZE - mapCamY;
 			// If no tileset is loaded, draw the index number
 			if(tsTexture == NULL) {
 				char str[8];
@@ -432,13 +422,14 @@ void draw_submenu(int menuIndex) {
 		menuy = TOOLBAR_Y + TOOLBAR_H,
 		menuw = MENUITEM_W,
 		menuh = MENUITEM_H * menuItemCount[menuIndex];
-	SDL_SetRenderDrawColor(renderer, 0x66, 0x44, 0x88, 0x7F);
-	fill_rect(menux, menuy, menuw, menuh);
+	//SDL_SetRenderDrawColor(renderer, 0x66, 0x44, 0x88, 0x7F);
+	//fill_rect(menux, menuy, menuw, menuh);
 	for(int i = 0; i < menuItemCount[menuIndex]; i++) {
-		if(menuSubHover == i) {
-			SDL_SetRenderDrawColor(renderer, 0xFF, 0x22, 0xAA, 0xFF);
-			fill_rect(menux, menuy + i * MENUITEM_H, menuw, MENUITEM_H);
-		}
+		if(subMenuGlow[i] > 0) subMenuGlow[i]--;
+		if(menuSubHover == i) subMenuGlow[i] = 20;
+		SDL_SetRenderDrawColor(renderer, 0x60 + subMenuGlow[i] * 2, 
+			0x40 + subMenuGlow[i], 0x80 + subMenuGlow[i], 0x9F);
+		fill_rect(menux, menuy + i * MENUITEM_H, menuw, MENUITEM_H);
 		graphics_draw_text(menu[menuIndex][i + 1], 
 			menux + 4, menuy + i * MENUITEM_H + 4, COLOR_WHITE);
 	}
@@ -447,11 +438,10 @@ void draw_submenu(int menuIndex) {
 void draw_toolbar() {
 	int x = TOOLBAR_X, y = TOOLBAR_Y;
 	for(int i = 0; i < MENU_COUNT; i++) {
-		if(menuHover == i || menuOpen == i) {
-			SDL_SetRenderDrawColor(renderer, 0xFF, 0x22, 0xAA, 0xFF);
-		} else {
-			SDL_SetRenderDrawColor(renderer, 0x66, 0x44, 0x88, 0xFF);
-		}
+		if(menuGlow[i] > 0) menuGlow[i]--;
+		if(menuHover == i || menuOpen == i) menuGlow[i] = 20;
+		SDL_SetRenderDrawColor(renderer, 
+			0x60 + menuGlow[i] * 2, 0x40 + menuGlow[i], 0x80 + menuGlow[i], 0xFF);
 		fill_rect(x, y, MENU_W, TOOLBAR_H);
 		graphics_draw_text(menu[i][0], x + 4, y + 4, COLOR_WHITE);
 		if(menuOpen == i) draw_submenu(i);
@@ -468,7 +458,7 @@ int main(int argc, char *argv[]) {
 	// GTK - must be init after SDL or crash
 	gtk_init(&argc, &argv);
 	// Load empty map
-	map = map_create("Untitled", 40, 28);
+	map = map_create_default();
 	while(!update_input()) {
 		// Update sections when mouse is over
 		mapHoverX = mapHoverY = tsHover = menuHover = -1;

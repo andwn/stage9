@@ -2,6 +2,16 @@
 #define INC_DIALOG_H_
 
 #include "common.h"
+#include "map.h"
+
+typedef struct {
+	bool cancelled;
+	char *name;
+	u16 width, height;
+	bool upperLayer, planA, byteTiles, wrapH, wrapV;
+} MapDialogResult;
+
+MapDialogResult* dialog_map_edit(const Map *map);
 
 /**
  * File chooser dialogs

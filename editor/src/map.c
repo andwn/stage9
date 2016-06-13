@@ -10,20 +10,29 @@
 #define FLAG_UPPERLAYER	0x01
 #define FLAG_PLANA		0x02
 #define FLAG_BYTETILES	0x04
+#define FLAG_WRAPH		0x08
+#define FLAG_WRAPV		0x10
 
-Map* map_create(const char *name, u16 width, u16 height) {
+Map* map_create(const char *name, u16 width, u16 height,
+		bool upperLayer, bool planA, bool byteTiles, bool wrapH, bool wrapV) {
 	lprintf(DEBUG, "Creating new map \"%s\" - %hu, %hu", name, width, height);
 	Map *map = calloc(sizeof(Map), 1);
 	map->version = S9M_VERSION;
 	map->name = calloc(1, strlen(name) + 1);
 	strcpy(map->name, name);
-	map->upperLayer = true;
-	map->planA = false;
-	map->byteTiles = false;
+	map->upperLayer = upperLayer;
+	map->planA = planA;
+	map->byteTiles = byteTiles;
+	map->wrapH = wrapH;
+	map->wrapV = wrapV;
 	map->width = width;
 	map->height = height;
 	map->tiles = calloc(2, width * height);
 	return map;
+}
+
+Map* map_create_default() {
+	return map_create("Untitled", 40, 28, 1, 0, 1, 0, 0);
 }
 
 void map_save(const char *filename, Map *map) {
@@ -37,7 +46,9 @@ void map_save(const char *filename, Map *map) {
 	// Flags
 	u8 flags = (map->upperLayer ? FLAG_UPPERLAYER : 0) +
 				(map->planA ? FLAG_PLANA : 0) +
-				(map->byteTiles ? FLAG_BYTETILES : 0);
+				(map->byteTiles ? FLAG_BYTETILES : 0) +
+				(map->wrapH ? FLAG_WRAPH : 0) +
+				(map->wrapV ? FLAG_WRAPV : 0);
 	fwrite(&flags, 1, 1, file);
 	// Name
 	u8 nameLen = strlen(map->name);
@@ -79,6 +90,8 @@ Map* map_open(const char *filename) {
 	map->upperLayer = (flags & FLAG_UPPERLAYER) ? 1 : 0;
 	map->planA = (flags & FLAG_PLANA) ? 1 : 0;
 	map->byteTiles = (flags & FLAG_BYTETILES) ? 1 : 0;
+	map->wrapH = (flags & FLAG_WRAPH) ? 1 : 0;
+	map->wrapV = (flags & FLAG_WRAPV) ? 1 : 0;
 	if(map->upperLayer && map->planA) {
 		lprintf(WARN, "Mutually exclusive options \"Enable Upper Layer\" and \"Use Plan A\"");
 	}
