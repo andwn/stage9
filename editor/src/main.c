@@ -1,14 +1,21 @@
+/**
+ * 
+ */
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <gtk/gtk.h>
 #include <stdlib.h>
 #include "common.h"
 #include "log.h"
-#include "s9map.h"
+#include "map.h"
 #include "dialog.h"
 #include "graphics.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
-#define map_tile(x, y) (map->tiles[(x) + (y) * map->layoutWidth])
+#define map_tile(x, y) (map->tiles[(x) + (y) * map->width])
 
 // Interface sizes
 #define BORDER_SIZE	2
@@ -74,10 +81,10 @@ enum {
 	MENU_TSET_CLOSE
 };
 enum {
-	MENU_TSET_ATTROPEN, 
-	MENU_TSET_ATTRSAVE, 
-	MENU_TSET_ATTRSAVEAS, 
-	MENU_TSET_ATTREDIT 
+	MENU_ATTR_OPEN, 
+	MENU_ATTR_SAVE, 
+	MENU_ATTR_SAVEAS, 
+	MENU_ATTR_EDIT 
 };
 enum {
 	MENU_VIEW_SHOWGRID,
@@ -91,7 +98,7 @@ enum {
 enum {
 	MENU_HELP_MANUAL,
 	MENU_HELP_GITHUB,
-	MANU_HELP_ABOUT
+	MENU_HELP_ABOUT
 };
 const u8 menuItemCount[MENU_COUNT] = { 6, 2, 4, 4, 1, 3 };
 const char menu[MENU_COUNT][MENU_MAXITEMCOUNT + 1][MENU_MAXLABELSIZE] = {
@@ -102,10 +109,12 @@ const char menu[MENU_COUNT][MENU_MAXITEMCOUNT + 1][MENU_MAXLABELSIZE] = {
 	{ "Tools", "Optimize Tileset" },
 	{ "Help", "Manual", "Github", "About" }
 };
+u8 menuGlow[MENU_COUNT] = { 0, 0, 0, 0, 0, 0 };
+u8 subMenuGlow[MENU_COUNT] = { 0, 0, 0, 0, 0, 0 };
 
 // Input
 #define MLEFT 	SDL_BUTTON_LEFT
-#define MRIGHT 	SDL_BUTTON_RIGHT
+#define MRIGHT 	6 //SDL_BUTTON_RIGHT
 
 #define mouse_left_pressed() (mstate & MLEFT && !(omstate & MLEFT))
 #define mouse_left_down() (mstate & MLEFT)
@@ -115,19 +124,27 @@ const char menu[MENU_COUNT][MENU_MAXITEMCOUNT + 1][MENU_MAXLABELSIZE] = {
 #define mouse_right_released() (omstate & MRIGHT && !(mstate & MRIGHT))
 #define mouse_within(x1, y1, x2, y2) (mousex > x1 && mousex < x2 && mousey > y1 && mousey < y2)
 
+// When the mouse is clicked over a control it locks to that
+// control to avoid accidental things from happening
+enum { LOCK_NONE, LOCK_TOOLBAR, LOCK_MAP, LOCK_TILESET, 
+	LOCK_MAPVSCROLL, LOCK_MAPHSCROLL, LOCK_TSETVSCROLL };
+
 u32 mstate = 0, omstate;
 int mousex = 0, mousey = 0;
+int mlock = LOCK_NONE;
 
 // Tileset
 char *tsFilename = NULL;
 SDL_Texture *tsTexture = NULL;
-char *tsPropFilename = NULL;
-//S9TileOpFile *tsProp = NULL;
 int tsWidth = 0, tsHeight = 0;
+
+// Tile Attributes
+char *attrFilename = NULL;
+u8 *attr = NULL;
 
 // Map
 char *mapFilename = NULL;
-S9Map *map = NULL;
+Map *map = NULL;
 
 // Current states of things
 int mapCamX = 0, mapCamY = 0;
@@ -141,25 +158,26 @@ void do_menu_action(int menuIndex, int item) {
 		case MENU_MAP:
 		switch(item) {
 			case MENU_MAP_NEW: {
-				S9Map *newMap = map_create("Untitled", 40, 28);
+				Map *newMap = map_create("Untitled", 40, 28);
 				if(newMap != NULL) {
-					map_free(map);
+					if(map != NULL) map_free(map);
 					map = newMap;
+					if(mapFilename != NULL) {
+						free(mapFilename);
+						mapFilename = NULL;
+					}
 				}
 				break;
 			}
 			case MENU_MAP_OPEN: {
-				char *newFilename = dialog_map_open(mapFilename);
+				char *newFilename = dialog_map_open();
 				if(newFilename != NULL) {
-					S9Map *newMap = map_open(newFilename);
+					Map *newMap = map_open(newFilename);
 					if(newMap != NULL) {
-						map_free(map);
+						if(map != NULL) map_free(map);
 						map = newMap;
-						// Make another copy of the string to keep the GTK stuff separate
-						free(mapFilename);
-						mapFilename = malloc(strlen(newFilename) + 1);
-						strcpy(mapFilename, newFilename);
-						g_free(newFilename);
+						if(mapFilename != NULL) free(mapFilename);
+						mapFilename = newFilename;
 					}
 				}
 				break;
@@ -170,14 +188,11 @@ void do_menu_action(int menuIndex, int item) {
 				break;
 			} // Fall into SaveAs if the filename is NULL
 			case MENU_MAP_SAVEAS: {
-				char *newFilename = dialog_map_save(mapFilename);
+				char *newFilename = dialog_map_save();
 				if(newFilename != NULL) {
 					map_save(newFilename, map);
-					// Make another copy of the string to keep the GTK stuff separate
-					free(mapFilename);
-					mapFilename = malloc(strlen(newFilename) + 1);
-					strcpy(mapFilename, newFilename);
-					g_free(newFilename);
+					if(mapFilename != NULL) free(mapFilename);
+					mapFilename = newFilename;
 				}
 				break;
 			}
@@ -189,11 +204,53 @@ void do_menu_action(int menuIndex, int item) {
 			break;
 		}
 		break;
-		case MENU_TSET: break;
+		case MENU_TSET: 
+		switch(item) {
+			case MENU_TSET_OPEN: {
+				char *newFilename = dialog_tileset_open();
+				if(newFilename != NULL) {
+					if(tsTexture != NULL) SDL_DestroyTexture(tsTexture);
+					tsTexture = graphics_load_texture(newFilename);
+					if(tsTexture != NULL) {
+						SDL_QueryTexture(tsTexture, NULL, NULL, &tsWidth, &tsHeight);
+						tsWidth /= TILE_SIZE;
+						tsHeight /= TILE_SIZE;
+						// Make another copy of the string to keep the GTK stuff separate
+						if(tsFilename != NULL) free(tsFilename);
+						tsFilename = newFilename;
+					}
+				}
+			}
+			break;
+		}
+		break;
 		case MENU_ATTR: break;
 		case MENU_VIEW: break;
 		case MENU_TOOL: break;
-		case MENU_HELP: break;
+		case MENU_HELP: 
+		switch(item) {
+			case MENU_HELP_MANUAL:
+			#ifdef _WIN32
+			ShellExecute(0, 0, L"wordpad ../doc/MANUAL.md", 0, 0 , SW_SHOW);
+			#elif __APPLE__
+			system("open '../doc/MANUAL.md'");
+			#else
+			system("xdg-open '../doc/MANUAL.md'");
+			#endif
+			break;
+			case MENU_HELP_GITHUB:
+			#ifdef _WIN32
+			ShellExecute(0, 0, L"https://github.com/andwn/stage9", 0, 0 , SW_SHOW);
+			#elif __APPLE__
+			system("open 'https://github.com/andwn/stage9'");
+			#else
+			system("xdg-open 'https://github.com/andwn/stage9'");
+			#endif
+			break;
+			case MENU_HELP_ABOUT:
+			break;
+		}
+		break;
 	}
 }
 
@@ -217,13 +274,13 @@ bool update_input() {
 			} else if(key == SDLK_DOWN) {
 				mapCamY += MAP_SCROLL_SPEED;
 			}
-			if(map != NULL) {
-				if(mapCamX > map->layoutWidth * TILE_SIZE - MAP_W)
-					mapCamX = map->layoutWidth * TILE_SIZE - MAP_W;
-				if(mapCamY > map->layoutHeight * TILE_SIZE - MAP_H)
-					mapCamY = map->layoutHeight * TILE_SIZE - MAP_H;
-				if(mapCamX < 0 || map->layoutWidth <= 40) mapCamX = 0;
-				if(mapCamY < 0 || map->layoutHeight <= 28) mapCamY = 0;
+			if(map != NULL) { // Stay in bounds
+				if(mapCamX > map->width * TILE_SIZE - MAP_W)
+					mapCamX = map->width * TILE_SIZE - MAP_W;
+				if(mapCamY > map->height * TILE_SIZE - MAP_H)
+					mapCamY = map->height * TILE_SIZE - MAP_H;
+				if(mapCamX < 0 || map->width <= 40) mapCamX = 0;
+				if(mapCamY < 0 || map->height <= 28) mapCamY = 0;
 			}
 		}
 	}
@@ -237,6 +294,7 @@ void update_submenu() {
 		menuw = MENUITEM_W,
 		menuh = MENUITEM_H * menuItemCount[menuOpen];
 	menuHover = menuOpen;
+	mlock = LOCK_TOOLBAR;
 	if(mouse_within(menux, menuy, menux+menuw, menuy+menuh)) { // Mouse inside menu
 		menuSubHover = (mousey - menuy) / MENUITEM_H;
 		if(mouse_left_pressed()) {
@@ -253,10 +311,11 @@ void update_map() {
 	// Get the map tile x and y underneath the mouse
 	mapHoverX = (mousex - MAP_X + mapCamX) / TILE_SIZE; 
 	mapHoverY = (mousey - MAP_Y + mapCamY) / TILE_SIZE;
-	if(mouse_left_down()) { // Draw tile
+	if(mouse_left_pressed() && mlock == LOCK_NONE) {
+		mlock = LOCK_MAP;
+	}
+	if(mouse_left_down() && mlock == LOCK_MAP) { // Draw tile
 		map_tile(mapHoverX, mapHoverY) = tsSelected;
-	} else if(mouse_right_down()) { // Erase
-		map_tile(mapHoverX, mapHoverY) = 0;
 	}
 }
 
@@ -265,7 +324,10 @@ void update_tileset() {
 	u16 mx = (mousex - TILESET_X) / TILE_SIZE, 
 		my = (mousey - TILESET_Y + tsScrollY) / TILE_SIZE;
 	tsHover = mx + my * (TILESET_W / TILE_SIZE);
-	if(mouse_left_down()) { // Select hovering tile
+	if(mouse_left_pressed() && mlock == LOCK_NONE) {
+		mlock = LOCK_TILESET;
+	}
+	if(mouse_left_down() && mlock == LOCK_TILESET) { // Select hovering tile
 		tsSelected = tsHover;
 	}
 }
@@ -290,11 +352,11 @@ void draw_map() {
 		bw = MAP_W / TILE_SIZE, bh = MAP_H / TILE_SIZE;
 	if(mapCamX % TILE_SIZE != 0) bw++;
 	if(mapCamY % TILE_SIZE != 0) bh++;
-	for(int y = by; y < bh && y < map->layoutHeight && y < by + bw; y++) {
-		for(int x = bx; x < bw && x < map->layoutWidth && x < by + bw; x++) {
+	for(int y = by; y < bh && y < map->height && y < by + bw; y++) {
+		for(int x = bx; x < bw && x < map->width && x < by + bw; x++) {
 			//lprintf(TRACE, "Tile at index: %d, %d", x, y);
 			// Tileset index for this map tile
-			u16 ind = map->tiles[y * map->layoutWidth + x];
+			u16 ind = map->tiles[y * map->width + x];
 			// Where to draw it on the screen
 			int drawx = MAP_X + x * TILE_SIZE - (mapCamX % TILE_SIZE), 
 				drawy = MAP_Y + y * TILE_SIZE - (mapCamY % TILE_SIZE);
@@ -406,14 +468,7 @@ int main(int argc, char *argv[]) {
 	// GTK - must be init after SDL or crash
 	gtk_init(&argc, &argv);
 	// Load empty map
-	//map = lmu_import("sample/mado.lmu");
 	map = map_create("Untitled", 40, 28);
-	// Tileset
-	tsTexture = graphics_load_texture("sample/main.png");
-	SDL_QueryTexture(tsTexture, NULL, NULL, &tsWidth, &tsHeight);
-	tsWidth /= TILE_SIZE;
-	tsHeight /= TILE_SIZE;
-	
 	while(!update_input()) {
 		// Update sections when mouse is over
 		mapHoverX = mapHoverY = tsHover = menuHover = -1;
@@ -426,6 +481,7 @@ int main(int argc, char *argv[]) {
 		} else if(mouse_within(TOOLBAR_X, TOOLBAR_Y, TOOLBAR_X+TOOLBAR_W, TOOLBAR_Y+TOOLBAR_H)) {
 			update_toolbar();
 		}
+		if(mouse_left_released()) mlock = LOCK_NONE;
 		// Draw
 		draw_map();
 		draw_tileset();
