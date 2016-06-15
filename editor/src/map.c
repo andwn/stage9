@@ -27,7 +27,7 @@ Map* map_create(const char *name, u16 width, u16 height,
 	map->wrapV = wrapV;
 	map->width = width;
 	map->height = height;
-	map->tiles = calloc(2, width * height);
+	map->tiles = calloc(2, width * height * (map->upperLayer ? 2 : 1));
 	return map;
 }
 

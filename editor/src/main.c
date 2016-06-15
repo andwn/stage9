@@ -15,7 +15,7 @@
 #include <windows.h>
 #endif
 
-#define map_tile(x, y) (map->tiles[(x) + (y) * map->width])
+#define map_tile(l, x, y) (map->tiles[(x) + (y) * map->width + (l) * map->width * map->height])
 
 // Interface sizes
 #define BORDER_SIZE	2
@@ -54,6 +54,11 @@
 #define MENUITEM_W	128
 #define MENUITEM_H	20
 
+#define BUTTONS_X	MAP_X
+#define BUTTONS_Y	(MAP_Y + MAP_H + BORDER_SIZE)
+#define BUTTON_W	96
+#define BUTTON_H	24
+
 #define MAP_SCROLL_SPEED 4
 
 // Menu
@@ -86,7 +91,7 @@ enum {
 };
 enum {
 	MENU_HELP_MANUAL,
-	MENU_HELP_GITHUB,
+	MENU_HELP_SOURCE,
 	MENU_HELP_ABOUT
 };
 const u8 menuItemCount[MENU_COUNT] = { 6, 2, 4, 3 };
@@ -94,10 +99,15 @@ const char menu[MENU_COUNT][MENU_MAXITEMCOUNT + 1][MENU_MAXLABELSIZE] = {
 	{ "Map", "New", "Open", "Save", "SaveAs", "Properties", "Close" },
 	{ "Tileset", "Open", "Close" },
 	{ "Tile Attributes", "Open", "Save", "SaveAs", "Edit" },
-	{ "Help", "Manual", "Github", "About" }
+	{ "Help", "Manual", "Source", "About" }
 };
 u8 menuGlow[MENU_COUNT] = { 0, 0, 0, 0 };
 u8 subMenuGlow[MENU_MAXITEMCOUNT] = { 0, 0, 0, 0, 0, 0 };
+
+// Buttons
+#define BUTTON_COUNT 2
+const char buttonText[BUTTON_COUNT][MENU_MAXLABELSIZE] = { "Lower", "Upper" };
+u8 buttonGlow[BUTTON_COUNT] = { 0, 0 };
 
 // Input
 #define MLEFT 	SDL_BUTTON_LEFT
@@ -139,6 +149,8 @@ int mapHoverX = -1, mapHoverY = -1;
 int tsScrollY = 0;
 int tsSelected = 0, tsHover = -1;
 int menuHover = -1, menuOpen = -1, menuSubHover = -1;
+int buttonHover = -1;
+bool upperSelected = false;
 
 void do_menu_action(int menuIndex, int item) {
 	switch(menuIndex) {
@@ -203,7 +215,7 @@ void do_menu_action(int menuIndex, int item) {
 				char *newFilename = dialog_tileset_open();
 				if(newFilename != NULL) {
 					if(tsTexture != NULL) SDL_DestroyTexture(tsTexture);
-					tsTexture = graphics_load_texture(newFilename);
+					tsTexture = graphics_load_texture(newFilename, true);
 					if(tsTexture != NULL) {
 						SDL_QueryTexture(tsTexture, NULL, NULL, &tsWidth, &tsHeight);
 						tsWidth /= TILE_SIZE;
@@ -233,7 +245,7 @@ void do_menu_action(int menuIndex, int item) {
 			system("xdg-open '../doc/MANUAL.md'");
 			#endif
 			break;
-			case MENU_HELP_GITHUB:
+			case MENU_HELP_SOURCE:
 			#ifdef _WIN32
 			ShellExecute(0, 0, L"https://github.com/andwn/stage9", 0, 0 , SW_SHOW);
 			#elif __APPLE__
@@ -305,7 +317,7 @@ void update_map() {
 		mlock = LOCK_MAP;
 	}
 	if(mouse_left_down() && mlock == LOCK_MAP) { // Draw tile
-		map_tile(mapHoverX, mapHoverY) = tsSelected;
+		map_tile(upperSelected, mapHoverX, mapHoverY) = tsSelected;
 	}
 }
 
@@ -331,6 +343,20 @@ void update_toolbar() {
 	}
 }
 
+void update_buttons() {
+	buttonHover = (mousex - BUTTONS_X) / (BUTTON_W + BORDER_SIZE);
+	if(!map->upperLayer) buttonHover += 2;
+	if(buttonHover >= BUTTON_COUNT || mousey >= BUTTONS_Y + BUTTON_H) {
+		buttonHover = -1;
+	} else if(mouse_left_pressed()) {
+		if(buttonHover == 0) {
+			upperSelected = 0;
+		} else if(buttonHover == 1) {
+			upperSelected = 1;
+		}
+	}
+}
+
 void draw_map() {
 	if(map == NULL) {
 		graphics_draw_text("No Map Loaded", MAP_X + 32, MAP_Y + 32, COLOR_WHITE);
@@ -342,38 +368,42 @@ void draw_map() {
 		bw = MAP_W / TILE_SIZE, bh = MAP_H / TILE_SIZE;
 	if(mapCamX % TILE_SIZE != 0) bw++;
 	if(mapCamY % TILE_SIZE != 0) bh++;
-	for(int y = by; y < by + bh && y < map->height; y++) {
-		for(int x = bx; x < bx + bw && x < map->width; x++) {
-			//lprintf(TRACE, "Tile at index: %d, %d", x, y);
-			// Tileset index for this map tile
-			u16 ind = map->tiles[y * map->width + x];
-			// Where to draw it on the screen
-			int drawx = MAP_X + x * TILE_SIZE - mapCamX, 
-				drawy = MAP_Y + y * TILE_SIZE - mapCamY;
-			// If no tileset is loaded, draw the index number
-			if(tsTexture == NULL) {
-				char str[8];
-				sprintf(str, "%d", ind);
-				graphics_draw_text(str, drawx + 1, drawy + 1, COLOR_WHITE);
-			} else {
-				draw_tile(tsTexture, 
-					(ind % tsWidth) * TILE_SIZE, 
-					(ind / tsWidth) * TILE_SIZE,
-					drawx, drawy, TILE_SIZE, TILE_SIZE
-				);
-			}
-			if(mapHoverX == x && mapHoverY == y) {
-				if(mouse_left_down()) fill_rect(drawx, drawy, TILE_SIZE, TILE_SIZE);
-				else draw_rect(drawx, drawy, TILE_SIZE, TILE_SIZE);
+	for(int l = 0; l <= map->upperLayer; l++) {
+		SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 
+			(l != 0 && !upperSelected) ? 0x7F : 0xFF);
+		for(int y = by; y < by + bh && y < map->height; y++) {
+			for(int x = bx; x < bx + bw && x < map->width; x++) {
+				//lprintf(TRACE, "Tile at index: %d, %d", x, y);
+				// Tileset index for this map tile
+				u16 ind = map_tile(l, x, y);
+				// Where to draw it on the screen
+				int drawx = MAP_X + x * TILE_SIZE - mapCamX, 
+					drawy = MAP_Y + y * TILE_SIZE - mapCamY;
+				// If no tileset is loaded, draw the index number
+				if(tsTexture == NULL) {
+					char str[8];
+					sprintf(str, "%d", ind);
+					graphics_draw_text(str, drawx + 1, drawy + 1, COLOR_WHITE);
+				} else {
+					draw_tile(tsTexture, 
+						(ind % tsWidth) * TILE_SIZE, 
+						(ind / tsWidth) * TILE_SIZE,
+						drawx, drawy, TILE_SIZE, TILE_SIZE
+					);
+				}
+				if(mapHoverX == x && mapHoverY == y) {
+					if(mouse_left_down()) fill_rect(drawx, drawy, TILE_SIZE, TILE_SIZE);
+					else draw_rect(drawx, drawy, TILE_SIZE, TILE_SIZE);
+				}
 			}
 		}
 	}
 	// Grid
 	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0x7F);
-	for(int x = MAP_X + mapCamX % TILE_SIZE; x < MAP_X + MAP_W; x += TILE_SIZE) {
+	for(int x = MAP_X + (mapCamX % TILE_SIZE); x < MAP_X + MAP_W; x += TILE_SIZE) {
 		fill_rect(x, MAP_Y, 1, MAP_H);
 	}
-	for(int y = MAP_Y + mapCamY % TILE_SIZE; y < MAP_Y + MAP_H; y += TILE_SIZE) {
+	for(int y = MAP_Y + (mapCamY % TILE_SIZE); y < MAP_Y + MAP_H; y += TILE_SIZE) {
 		fill_rect(MAP_X, y, MAP_W, 1);
 	}
 	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
@@ -450,6 +480,22 @@ void draw_toolbar() {
 	}
 }
 
+void draw_buttons() {
+	int x = BUTTONS_X, y = BUTTONS_Y;
+	if(map->upperLayer) {
+		for(int i = 0; i < 2; i++) {
+			if(buttonGlow[i] > 0) buttonGlow[i]--;
+			if(buttonHover == i || upperSelected == i) buttonGlow[i] = 20;
+			SDL_SetRenderDrawColor(renderer, 0x60 + buttonGlow[i] * 2, 
+				0x40 + buttonGlow[i], 0x80 + buttonGlow[i], 0xFF);
+			fill_rect(x, y, BUTTON_W, BUTTON_H);
+			graphics_draw_text(buttonText[i], x + 4, y + 4, COLOR_WHITE);
+			SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+			x += BUTTON_W + BORDER_SIZE;
+		}
+	}
+}
+
 int main(int argc, char *argv[]) {
 	lopen("log.txt");
 	atexit(lclose);
@@ -470,6 +516,8 @@ int main(int argc, char *argv[]) {
 			update_tileset();
 		} else if(mouse_within(TOOLBAR_X, TOOLBAR_Y, TOOLBAR_X+TOOLBAR_W, TOOLBAR_Y+TOOLBAR_H)) {
 			update_toolbar();
+		} else if(mousey >= BUTTONS_Y) {
+			update_buttons();
 		}
 		if(mouse_left_released()) mlock = LOCK_NONE;
 		// Draw
@@ -477,6 +525,7 @@ int main(int argc, char *argv[]) {
 		draw_tileset();
 		draw_border();
 		draw_toolbar();
+		draw_buttons();
 		graphics_present();
 	}
 	graphics_close();

@@ -22,7 +22,7 @@ void MAP_loadData(const u8 *data) {
 		SYS_die(str);
 	}
 	u8 flags = data[2];
-	upperLayer = 0; //(flags & FLAG_UPPERLAYER) > 0;
+	upperLayer = (flags & FLAG_UPPERLAYER) > 0;
 	usePlanA = (flags & FLAG_PLANA) > 0;
 	byteTiles = (flags & FLAG_BYTETILES) > 0;
 	u8 nameLen = data[3];

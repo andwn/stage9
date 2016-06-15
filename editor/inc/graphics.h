@@ -6,7 +6,7 @@
 #include "common.h"
 
 #define WIN_W		800
-#define WIN_H		600
+#define WIN_H		568
 #define REND_OPS	SDL_RENDERER_PRESENTVSYNC
 
 #define FONT_SIZE_X	5
@@ -43,7 +43,7 @@ SDL_Renderer *renderer;
 
 void graphics_init();
 
-SDL_Texture* graphics_load_texture(const char *filename);
+SDL_Texture* graphics_load_texture(const char *filename, bool transparent);
 
 void graphics_draw_text(const char *text, int x, int y, SDL_Color color);
 

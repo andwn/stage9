@@ -67,6 +67,7 @@ int main() {
 	SPR_init(80, 0, 0);
 	// Interrupts should be disabled while doing VDP stuff
 	SYS_disableInts();
+	VDP_setEnable(0);
 	VDP_setPlanSize(64, 32);
 	// Load sample tiles & palettes
 	VDP_setPalette(PAL0, PAL_Character.data);
@@ -77,6 +78,7 @@ int main() {
 	MAP_drawArea(camera.x / BLOCK_SIZE, camera.y / BLOCK_SIZE, 21, 15);
 	// VInt function used for scrolling
 	SYS_setVIntCallback(vblank);
+	VDP_setEnable(1);
 	SYS_enableInts();
 	while(1) {
 		// Update player according to user input

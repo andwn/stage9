@@ -19,18 +19,24 @@ void graphics_init() {
 	init((renderer = SDL_CreateRenderer(window, -1, REND_OPS)) == NULL, SDL_GetError);
 	// Load font
 	lprintf(DEBUG, "Loading font.png");
-	init((font = graphics_load_texture("font.png")) == NULL, SDL_GetError);
+	init((font = graphics_load_texture("font.png", false)) == NULL, SDL_GetError);
 	// Alpha blending
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	frameTime = SDL_GetTicks();
 }
 
-SDL_Texture* graphics_load_texture(const char *filename) {
+SDL_Texture* graphics_load_texture(const char *filename, bool transparent) {
 	lprintf(DEBUG, "Loading texture: %s", filename);
 	SDL_Surface *surface = IMG_Load(filename);
 	if(surface == NULL) {
 		lprintf(ERROR, SDL_GetError());
 		return NULL;
+	}
+	if(transparent) {
+		// Make upper left pixel color transparency
+		SDL_LockSurface(surface);
+		SDL_SetColorKey(surface, true, ((u32*) surface->pixels)[0]);
+		SDL_UnlockSurface(surface);
 	}
 	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
 	SDL_FreeSurface(surface);
