@@ -26,7 +26,7 @@ const struct
     "(C)FLEMTEAM 2013",
     "Stage9 Map Demo                                 ",
     "Stage9 Map Demo                                 ",
-    "GM 00000000-00",
+    "GM 20160615-00",
     0x0000,
     "JD              ",
     0x00000000,

@@ -16,6 +16,8 @@ Map* map_create(const char *name, u16 width, u16 height,
 
 Map* map_create_default();
 
+void map_copy_tiles(Map *from, Map *to);
+
 void map_save(const char *filename, Map *s9m);
 
 Map* map_open(const char *filename);

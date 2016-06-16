@@ -1,7 +1,20 @@
 /**
- * 
+ *  Simple-ish editor for tilemaps. Meant for MegaDrive but the format is portable.
+ *  Copyright (C) 2016 andwn
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <gtk/gtk.h>
@@ -91,15 +104,14 @@ enum {
 };
 enum {
 	MENU_HELP_MANUAL,
-	MENU_HELP_SOURCE,
-	MENU_HELP_ABOUT
+	MENU_HELP_SOURCE
 };
-const u8 menuItemCount[MENU_COUNT] = { 6, 2, 4, 3 };
+const u8 menuItemCount[MENU_COUNT] = { 6, 2, 4, 2 };
 const char menu[MENU_COUNT][MENU_MAXITEMCOUNT + 1][MENU_MAXLABELSIZE] = {
 	{ "Map", "New", "Open", "Save", "SaveAs", "Properties", "Close" },
 	{ "Tileset", "Open", "Close" },
 	{ "Tile Attributes", "Open", "Save", "SaveAs", "Edit" },
-	{ "Help", "Manual", "Source", "About" }
+	{ "Help", "Manual", "Source" }
 };
 u8 menuGlow[MENU_COUNT] = { 0, 0, 0, 0 };
 u8 subMenuGlow[MENU_MAXITEMCOUNT] = { 0, 0, 0, 0, 0, 0 };
@@ -152,17 +164,22 @@ int menuHover = -1, menuOpen = -1, menuSubHover = -1;
 int buttonHover = -1;
 bool upperSelected = false;
 
+// Nested switch statements aren't very organized but whatever
+// Some cases are given blocks because variables
 void do_menu_action(int menuIndex, int item) {
 	switch(menuIndex) {
 		case MENU_MAP:
 		switch(item) {
 			case MENU_MAP_NEW: {
+				// Create a new map dialog (NULL means new map)
 				MapDialogResult *result = dialog_map_edit(NULL);
+				// And create a map if it wasn't cancelled
 				if(!result->cancelled) {
 					Map *newMap = map_create(result->name, result->width, result->height,
 						result->upperLayer, result->planA, result->byteTiles,
 						result->wrapH, result->wrapV);
 					if(newMap != NULL) {
+						// There might be a map already loaded so clean it up first
 						if(map != NULL) map_free(map);
 						map = newMap;
 						if(mapFilename != NULL) {
@@ -175,6 +192,7 @@ void do_menu_action(int menuIndex, int item) {
 				break;
 			}
 			case MENU_MAP_OPEN: {
+				// Browse to a file and open it
 				char *newFilename = dialog_map_open();
 				if(newFilename != NULL) {
 					Map *newMap = map_open(newFilename);
@@ -201,11 +219,31 @@ void do_menu_action(int menuIndex, int item) {
 				}
 				break;
 			}
-			case MENU_MAP_PROPERTIES:
+			case MENU_MAP_PROPERTIES: {
+				// Edit an existing map, pass what is loaded to the dialog
+				if(map == NULL) break;
+				MapDialogResult *result = dialog_map_edit(map);
+				// Create a new map if the dialog wasn't cancelled
+				if(!result->cancelled) {
+					Map *newMap = map_create(result->name, result->width, result->height,
+						result->upperLayer, result->planA, result->byteTiles,
+						result->wrapH, result->wrapV);
+					if(newMap != NULL) {
+						// Copy the current map's tile data into the new one
+						map_copy_tiles(map, newMap);
+						// Finally replace current map with the new one
+						map_free(map);
+						map = newMap;
+					}
+				}
+				free(result);
+			}
 			break;
 			case MENU_MAP_CLOSE:
-			map_free(map);
+			if(map != NULL) map_free(map);
 			map = NULL;
+			if(mapFilename != NULL) free(mapFilename);
+			mapFilename = NULL;
 			break;
 		}
 		break;
@@ -228,7 +266,7 @@ void do_menu_action(int menuIndex, int item) {
 			}
 			break;
 			case MENU_TSET_CLOSE:
-			SDL_DestroyTexture(tsTexture);
+			if(tsTexture != NULL) SDL_DestroyTexture(tsTexture);
 			tsTexture = NULL;
 			break;
 		}
@@ -253,8 +291,6 @@ void do_menu_action(int menuIndex, int item) {
 			#else
 			system("xdg-open 'https://github.com/andwn/stage9'");
 			#endif
-			break;
-			case MENU_HELP_ABOUT:
 			break;
 		}
 		break;

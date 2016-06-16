@@ -7,9 +7,5 @@ TILESET TS_Tiny16		"tiny16.png" 0
 PALETTE PAL_Character	"character.png" 0
 SPRITE SPR_Character	"character.png" 2 2 0 10 NONE
 
-# Some BGM to be less boring, a sample track from Deflemask
-# SMRPG cover by LeCheeseMaster
-XGM BGM_Forest			"forest.vgm" 5
-
 # Sample maps
 BIN MAP_World			"world.s9m"

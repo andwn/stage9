@@ -5,6 +5,8 @@
 #include <string.h>
 #include "log.h"
 
+#define min(a, b) (a > b ? b : a)
+
 #define S9M_VERSION 1
 
 #define FLAG_UPPERLAYER	0x01
@@ -33,6 +35,21 @@ Map* map_create(const char *name, u16 width, u16 height,
 
 Map* map_create_default() {
 	return map_create("Untitled", 40, 28, 1, 0, 1, 0, 0);
+}
+
+void map_copy_tiles(Map *from, Map *to) {
+	// Tiles will be truncated to whichever map is smaller
+	int lmax = min(from->upperLayer, to->upperLayer);
+	int xmax = min(from->width, to->width);
+	int ymax = min(from->height, to->height);
+	for(int l = 0; l <= lmax; l++) {
+		for(int y = 0; y < ymax; y++) {
+			for(int x = 0; x < xmax; x++) {
+				to->tiles[l * to->width * to->height + y * to->width + x] =
+					from->tiles[l * from->width * from->height + y * from->width + x];
+			}
+		}
+	}
 }
 
 void map_save(const char *filename, Map *map) {
