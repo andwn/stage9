@@ -140,6 +140,7 @@ enum { LOCK_NONE, LOCK_TOOLBAR, LOCK_MAP, LOCK_TILESET,
 
 u32 mstate = 0, omstate;
 int mousex = 0, mousey = 0;
+int omousex, omousey;
 int mlock = LOCK_NONE;
 
 // Tileset
@@ -303,10 +304,21 @@ bool update_input() {
 	while(SDL_PollEvent(&event)) {
 		if(event.type == SDL_QUIT) {
 			return true;
+		} else if(event.type == SDL_MOUSEWHEEL) {
+			int dir = event.wheel.direction == SDL_MOUSEWHEEL_NORMAL ? 1 : -1;
+			int tsAdjustedHeight = tsWidth * tsHeight / (TILESET_W / TILE_SIZE);
+			tsScrollY += event.wheel.y * 2 * dir;
+			if(tsScrollY < 0) {
+				tsScrollY = 0;
+			} else if(tsScrollY > tsAdjustedHeight * TILE_SIZE) {
+				tsScrollY = tsAdjustedHeight * TILE_SIZE;
+			}
 		}
 	}
 	// Mouse state
 	omstate = mstate;
+	omousex = mousex;
+	omousey = mousey;
 	mstate = SDL_GetMouseState(&mousex, &mousey);
 	// Keyboard
 	const u8 *key = SDL_GetKeyboardState(NULL);
@@ -331,17 +343,40 @@ void update_submenu() {
 		menuy = TOOLBAR_Y + TOOLBAR_H,
 		menuw = MENUITEM_W,
 		menuh = MENUITEM_H * menuItemCount[menuOpen];
-	menuHover = menuOpen;
 	mlock = LOCK_TOOLBAR;
 	if(mouse_within(menux, menuy, menux+menuw, menuy+menuh)) { // Mouse inside menu
+		menuHover = menuOpen;
 		menuSubHover = (mousey - menuy) / MENUITEM_H;
 		if(mouse_left_pressed()) {
 			do_menu_action(menuOpen, menuSubHover);
 			menuOpen = -1;
 		}
-	} else { // Outside menu, unhighlight, close if clicked
+	} else { 
+		if(mouse_within(TOOLBAR_X, TOOLBAR_Y, TOOLBAR_X+TOOLBAR_W, TOOLBAR_Y+TOOLBAR_H)) {
+			// Hovering over other menus will open their submenus
+			menuOpen = menuHover;
+		}
+		// Outside menu, unhighlight, close if clicked
 		menuSubHover = -1;
 		if(mouse_left_pressed()) menuOpen = -1;
+	}
+}
+
+void update_tsetvscroll() {
+	int tsAdjustedHeight = tsWidth * tsHeight / (TILESET_W / TILE_SIZE);
+	if(tsAdjustedHeight <= (TILESET_H / TILE_SIZE)) {
+		return; // Tileset not large enough for scrollbar
+	}
+	if(mouse_left_pressed() && mlock == LOCK_NONE) {
+		mlock = LOCK_TSETVSCROLL;
+	}
+	if(mouse_left_down() && mlock == LOCK_TSETVSCROLL) {
+		tsScrollY += mousey - omousey;
+		if(tsScrollY < 0) {
+			tsScrollY = 0;
+		} else if(tsScrollY > tsAdjustedHeight * TILE_SIZE) {
+			tsScrollY = tsAdjustedHeight * TILE_SIZE;
+		}
 	}
 }
 
@@ -482,6 +517,10 @@ void draw_border() {
 	
 }
 
+void draw_scrollbars() {
+	
+}
+
 void draw_submenu(int menuIndex) {
 	int menux = TOOLBAR_X + menuIndex * MENU_W,
 		menuy = TOOLBAR_Y + TOOLBAR_H,
@@ -544,7 +583,7 @@ int main(int argc, char *argv[]) {
 			update_submenu();
 		} else if(mouse_within(TSETVSCROLL_X, TSETVSCROLL_Y, TSETVSCROLL_X+TSETVSCROLL_W, 
 			TSETVSCROLL_Y+TSETVSCROLL_H) || mlock == LOCK_TSETVSCROLL) {
-			//update_tsetvscroll();
+			update_tsetvscroll();
 		} else if(mouse_within(MAP_X, MAP_Y, MAP_X + MAP_W, MAP_Y + MAP_H)) {
 			update_map();
 		} else if(mouse_within(TILESET_X, TILESET_Y, TILESET_X+TILESET_W, TILESET_Y+TILESET_H)) {
@@ -559,6 +598,7 @@ int main(int argc, char *argv[]) {
 		draw_map();
 		draw_tileset();
 		draw_border();
+		draw_scrollbars();
 		draw_toolbar();
 		draw_buttons();
 		graphics_present();
