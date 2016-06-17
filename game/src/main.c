@@ -10,7 +10,7 @@
 #define WALK_SPEED		1
 #define RUN_SPEED		2
 
-enum { STATE_STAND, STATE_WALK, STATE_RUN };
+enum { STATE_STAND, STATE_WALK };
 enum { DIR_LEFT, DIR_UP, DIR_RIGHT, DIR_DOWN };
 
 typedef struct {
@@ -88,32 +88,33 @@ int main() {
 			// Start to walk if pressing any direction, make sure the player isn't
 			// going out of bounds though. Holding B makes walking faster
 			if((joy & BUTTON_LEFT) && player.x > 0) {
-				player.state = (joy & BUTTON_B) ? STATE_RUN : STATE_WALK;
+				player.state = STATE_WALK;
 				player.direction = DIR_LEFT;
 			} else if((joy & BUTTON_UP) && player.y > 0) {
-				player.state = (joy & BUTTON_B) ? STATE_RUN : STATE_WALK;
+				player.state = STATE_WALK;
 				player.direction = DIR_UP;
 			} else if((joy & BUTTON_RIGHT) && player.x / BLOCK_SIZE < MAP_getWidth() - 1) {
-				player.state = (joy & BUTTON_B) ? STATE_RUN : STATE_WALK;
+				player.state = STATE_WALK;
 				player.direction = DIR_RIGHT;
 			} else if((joy & BUTTON_DOWN) && player.y / BLOCK_SIZE < MAP_getHeight() - 1) {
-				player.state = (joy & BUTTON_B) ? STATE_RUN : STATE_WALK;
+				player.state = STATE_WALK;
 				player.direction = DIR_DOWN;
 			} else if(player.sprite->animInd != player.direction) {
 				// Show standing animation if not moving
 				SPR_setAnim(player.sprite, player.direction);
 			}
 		}
-		if(player.state == STATE_WALK || player.state == STATE_RUN) {
+		if(player.state == STATE_WALK) {
 			// Move in walking direction
+			s16 old_x = player.x, old_y = player.y;
 			if(player.direction == DIR_LEFT) 
-				player.x -= (player.state == STATE_RUN) ? RUN_SPEED : WALK_SPEED;
+				player.x -= (joy & BUTTON_B) ? RUN_SPEED : WALK_SPEED;
 			else if(player.direction == DIR_UP) 
-				player.y -= (player.state == STATE_RUN) ? RUN_SPEED : WALK_SPEED;
+				player.y -= (joy & BUTTON_B) ? RUN_SPEED : WALK_SPEED;
 			else if(player.direction == DIR_RIGHT) 
-				player.x += (player.state == STATE_RUN) ? RUN_SPEED : WALK_SPEED;
+				player.x += (joy & BUTTON_B) ? RUN_SPEED : WALK_SPEED;
 			else if(player.direction == DIR_DOWN) 
-				player.y += (player.state == STATE_RUN) ? RUN_SPEED : WALK_SPEED;
+				player.y += (joy & BUTTON_B) ? RUN_SPEED : WALK_SPEED;
 			// Set player sprite position
 			SPR_setPosition(player.sprite, player.x - camera.x, player.y - camera.y);
 			// Make sure player sprite is walking and facing right direction
@@ -121,10 +122,24 @@ int main() {
 				SPR_setAnim(player.sprite, player.direction + 4);
 			}
 			// If the next tile has been reached, switch back to standing state
-			if((player.x % BLOCK_SIZE == 0) && (player.y % BLOCK_SIZE == 0)) 
+			if((player.x % BLOCK_SIZE == 0) && (player.y % BLOCK_SIZE == 0)) {
 				player.state = STATE_STAND;
+			}
+			// Less naive check since running may not always be aligned to the grid
+			if((old_x % BLOCK_SIZE != 0 && player.x / BLOCK_SIZE != old_x / BLOCK_SIZE) ||
+				(old_y % BLOCK_SIZE != 0 && player.y / BLOCK_SIZE != old_y / BLOCK_SIZE)) {
+				player.state = STATE_STAND;
+				// Align to grid
+				player.x += ((player.x % BLOCK_SIZE) >= (BLOCK_SIZE / 2))
+					? BLOCK_SIZE - (player.x % BLOCK_SIZE)
+					: -(player.x % BLOCK_SIZE);
+				player.y += ((player.y % BLOCK_SIZE) >= (BLOCK_SIZE / 2))
+					? BLOCK_SIZE - (player.y % BLOCK_SIZE)
+					: -(player.y % BLOCK_SIZE);
+			}
+			
 			// Update camera based on player movement
-			s16 old_x = camera.x, old_y = camera.y;
+			old_x = camera.x; old_y = camera.y;
 			camera.x = player.x - SCREEN_HALF_W + 8;
 			camera.y = player.y - SCREEN_HALF_H + 8;
 			// Keep camera in bounds
