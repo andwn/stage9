@@ -1,5 +1,9 @@
-log.txt
-stage9
 *.o
-src/*.o
+editor/log.txt
+editor/stage9
+game/out
+game/out.elf
+game/out.bin
+game/temp.bin
+game/res/resources.h
 
