@@ -14,42 +14,42 @@ GtkFileFilter* pattern_filter(const char *name, const char *pattern) {
 MapDialogResult* dialog_map_edit(const Map *map) {
 	MapDialogResult *result = calloc(sizeof(MapDialogResult), 1);
 	result->cancelled = true;
-	GtkWidget *dialog = gtk_dialog_new_with_buttons(
+	GtkDialog *dialog = GTK_DIALOG(gtk_dialog_new_with_buttons(
 		map == NULL ? "New Map" : "Map Properties", NULL, 0, 
-		GTK_STOCK_OK, GTK_RESPONSE_ACCEPT, GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL);
+		GTK_STOCK_OK, GTK_RESPONSE_ACCEPT, GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL));
 	// Name of map
 	GtkWidget *lblName = gtk_label_new("Name");
-	GtkWidget *txtName = gtk_entry_new_with_max_length(31);
-	GtkWidget *boxName = gtk_hbox_new(false, 8);
+	GtkEntry *txtName = GTK_ENTRY(gtk_entry_new_with_max_length(31));
+	GtkBox *boxName = GTK_BOX(gtk_hbox_new(false, 8));
 	gtk_box_pack_start_defaults(boxName, lblName);
-	gtk_box_pack_start_defaults(boxName, txtName);
+	gtk_box_pack_start_defaults(boxName, GTK_WIDGET(txtName));
 	// Width & height spinner
 	GtkWidget *lblWidth = gtk_label_new("Width");
 	GtkWidget *lblHeight = gtk_label_new("Height");
-	GtkWidget *numWidth = gtk_spin_button_new_with_range(20, 999, 1);
-	GtkWidget *numHeight = gtk_spin_button_new_with_range(14, 999, 1);
-	GtkWidget *boxWidth = gtk_hbox_new(false, 8);
-	GtkWidget *boxHeight = gtk_hbox_new(false, 8);
+	GtkSpinButton *numWidth = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(20, 999, 1));
+	GtkSpinButton *numHeight = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(14, 999, 1));
+	GtkBox *boxWidth = GTK_BOX(gtk_hbox_new(false, 8));
+	GtkBox *boxHeight = GTK_BOX(gtk_hbox_new(false, 8));
 	gtk_box_pack_start_defaults(boxWidth, lblWidth);
-	gtk_box_pack_start_defaults(boxWidth, numWidth);
+	gtk_box_pack_start_defaults(boxWidth, GTK_WIDGET(numWidth));
 	gtk_box_pack_start_defaults(boxHeight, lblHeight);
-	gtk_box_pack_start_defaults(boxHeight, numHeight);
+	gtk_box_pack_start_defaults(boxHeight, GTK_WIDGET(numHeight));
 	// Check boxes for flags
 	GtkWidget *lblOptions = gtk_label_new("Options");
-	GtkWidget *chkOptions[5] = {
-		gtk_check_button_new_with_label("Enable Upper Layer"),
-		gtk_check_button_new_with_label("Draw map to PLAN_A"),
-		gtk_check_button_new_with_label("Single byte tiles"),
-		gtk_check_button_new_with_label("Wrap Horizontal"),
-		gtk_check_button_new_with_label("Wrap Vertical")
+	GtkToggleButton *chkOptions[5] = {
+		GTK_TOGGLE_BUTTON(gtk_check_button_new_with_label("Enable Upper Layer")),
+		GTK_TOGGLE_BUTTON(gtk_check_button_new_with_label("Draw map to PLAN_A")),
+		GTK_TOGGLE_BUTTON(gtk_check_button_new_with_label("Single byte tiles")),
+		GTK_TOGGLE_BUTTON(gtk_check_button_new_with_label("Wrap Horizontal")),
+		GTK_TOGGLE_BUTTON(gtk_check_button_new_with_label("Wrap Vertical"))
 	};
 	// Stack these into the dialog vbox
-	gtk_box_pack_start_defaults(GTK_DIALOG(dialog)->vbox, boxName);
-	gtk_box_pack_start_defaults(GTK_DIALOG(dialog)->vbox, boxWidth);
-	gtk_box_pack_start_defaults(GTK_DIALOG(dialog)->vbox, boxHeight);
-	gtk_box_pack_start_defaults(GTK_DIALOG(dialog)->vbox, lblOptions);
+	gtk_box_pack_start_defaults(GTK_BOX(dialog->vbox), GTK_WIDGET(boxName));
+	gtk_box_pack_start_defaults(GTK_BOX(dialog->vbox), GTK_WIDGET(boxWidth));
+	gtk_box_pack_start_defaults(GTK_BOX(dialog->vbox), GTK_WIDGET(boxHeight));
+	gtk_box_pack_start_defaults(GTK_BOX(dialog->vbox), lblOptions);
 	for(int i = 0; i < 5; i++)
-		gtk_box_pack_start_defaults(GTK_DIALOG(dialog)->vbox, chkOptions[i]);
+		gtk_box_pack_start_defaults(GTK_BOX(dialog->vbox), GTK_WIDGET(chkOptions[i]));
 	// Set current or default values
 	if(map == NULL) { // New Map
 		gtk_entry_set_text(txtName, "Untitled");
@@ -71,8 +71,8 @@ MapDialogResult* dialog_map_edit(const Map *map) {
 		gtk_toggle_button_set_active(chkOptions[4], map->wrapV);
 	}
 	// Finally run the dialog
-	gtk_widget_show_all(dialog);
-	if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+	gtk_widget_show_all(GTK_WIDGET(dialog));
+	if(gtk_dialog_run(dialog) == GTK_RESPONSE_ACCEPT) {
 		result->cancelled = false;
 		// Grab the new name
 		const char *mn = gtk_entry_get_text(txtName);
@@ -88,7 +88,7 @@ MapDialogResult* dialog_map_edit(const Map *map) {
 		result->wrapH = gtk_toggle_button_get_active(chkOptions[3]);
 		result->wrapV = gtk_toggle_button_get_active(chkOptions[4]);
 	}
-	gtk_widget_destroy(dialog);
+	gtk_widget_destroy(GTK_WIDGET(dialog));
 	while(gtk_events_pending()) gtk_main_iteration();
 	return result;
 }

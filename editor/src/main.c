@@ -67,8 +67,8 @@
 #define MENUITEM_W	128
 #define MENUITEM_H	20
 
-#define BUTTONS_X	MAP_X
-#define BUTTONS_Y	(MAP_Y + MAP_H + BORDER_SIZE)
+#define BUTTONS_X	MAPHSCROLL_X
+#define BUTTONS_Y	(MAPHSCROLL_Y + MAPHSCROLL_H + BORDER_SIZE)
 #define BUTTON_W	96
 #define BUTTON_H	24
 
@@ -483,13 +483,9 @@ void draw_border() {
 }
 
 void draw_submenu(int menuIndex) {
-	//lprintf(TRACE, "Drawing submenu %d", menuIndex);
 	int menux = TOOLBAR_X + menuIndex * MENU_W,
 		menuy = TOOLBAR_Y + TOOLBAR_H,
-		menuw = MENUITEM_W,
-		menuh = MENUITEM_H * menuItemCount[menuIndex];
-	//SDL_SetRenderDrawColor(renderer, 0x66, 0x44, 0x88, 0x7F);
-	//fill_rect(menux, menuy, menuw, menuh);
+		menuw = MENUITEM_W;
 	for(int i = 0; i < menuItemCount[menuIndex]; i++) {
 		if(subMenuGlow[i] > 0) subMenuGlow[i]--;
 		if(menuSubHover == i) subMenuGlow[i] = 20;
@@ -546,6 +542,9 @@ int main(int argc, char *argv[]) {
 		mapHoverX = mapHoverY = tsHover = menuHover = -1;
 		if(menuOpen != -1) {
 			update_submenu();
+		} else if(mouse_within(TSETVSCROLL_X, TSETVSCROLL_Y, TSETVSCROLL_X+TSETVSCROLL_W, 
+			TSETVSCROLL_Y+TSETVSCROLL_H) || mlock == LOCK_TSETVSCROLL) {
+			//update_tsetvscroll();
 		} else if(mouse_within(MAP_X, MAP_Y, MAP_X + MAP_W, MAP_Y + MAP_H)) {
 			update_map();
 		} else if(mouse_within(TILESET_X, TILESET_Y, TILESET_X+TILESET_W, TILESET_Y+TILESET_H)) {

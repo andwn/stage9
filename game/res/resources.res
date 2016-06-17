@@ -7,5 +7,7 @@ TILESET TS_Tiny16		"tiny16.png" 0
 PALETTE PAL_Character	"character.png" 0
 SPRITE SPR_Character	"character.png" 2 2 0 10 NONE
 
+#XGM BGM_Song			"song.vgm" 5
+
 # Sample maps
 BIN MAP_World			"world.s9m"

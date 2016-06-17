@@ -1,5 +1,6 @@
 #include "map.h"
 
+#include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,57 +54,55 @@ void map_copy_tiles(Map *from, Map *to) {
 }
 
 void map_save(const char *filename, Map *map) {
-	FILE *file = fopen(filename, "wb");
+	SDL_RWops *file = SDL_RWFromFile(filename, "wb");
 	if(file == NULL) {
 		lprintf(ERROR, "Unable to open or create file: %s", filename);
 		return;
 	}
 	// Version
-	fwrite(&map->version, 2, 1, file);
+	SDL_WriteBE16(file, map->version);
 	// Flags
-	u8 flags = (map->upperLayer ? FLAG_UPPERLAYER : 0) +
-				(map->planA ? FLAG_PLANA : 0) +
-				(map->byteTiles ? FLAG_BYTETILES : 0) +
-				(map->wrapH ? FLAG_WRAPH : 0) +
-				(map->wrapV ? FLAG_WRAPV : 0);
-	fwrite(&flags, 1, 1, file);
+	SDL_WriteU8(file, (map->upperLayer ? FLAG_UPPERLAYER : 0) +
+					(map->planA ? FLAG_PLANA : 0) +
+					(map->byteTiles ? FLAG_BYTETILES : 0) +
+					(map->wrapH ? FLAG_WRAPH : 0) +
+					(map->wrapV ? FLAG_WRAPV : 0));
 	// Name
 	u8 nameLen = strlen(map->name);
-	fwrite(&nameLen, 1, 1, file);
-	if(nameLen > 0) fwrite(map->name, 1, nameLen, file);
+	SDL_WriteU8(file, nameLen);
+	if(nameLen > 0) SDL_RWwrite(file, map->name, 1, nameLen);
 	// Width, Height
-	fwrite(&map->width, 2, 1, file);
-	fwrite(&map->height, 2, 1, file);
+	SDL_WriteBE16(file, map->width);
+	SDL_WriteBE16(file, map->height);
 	// Size doubled if there is an upper layer
 	u32 tsize = map->width * map->height * (map->upperLayer ? 2 : 1);
 	// Store as 1 or 2 bytes depending on setting
 	for(u32 i = 0; i < tsize; i++) {
-		fwrite(&map->tiles[i], 2 - map->byteTiles, 1, file);
+		if(map->byteTiles) SDL_WriteU8(file, map->tiles[i]);
+		else SDL_WriteBE16(file, map->tiles[i]);
 	}
-	fclose(file);
+	SDL_RWclose(file);
 }
 
 Map* map_open(const char *filename) {
-	lprintf(TRACE, "map_open: begin");
-	FILE *file = fopen(filename, "rb");
+	SDL_RWops *file = SDL_RWFromFile(filename, "rb");
 	if(file == NULL) {
 		lprintf(ERROR, "Unable to open file: %s", filename);
 		return NULL;
 	}
 	Map *map = calloc(sizeof(Map), 1);
 	// Version
-	lprintf(TRACE, "map_open: version");
-	fread(&map->version, 2, 1, file);
+	map->version = SDL_ReadLE16(file);
 	if(map->version > S9M_VERSION) {
-		lprintf(ERROR, "Map was created in a newer version. Update!");
+		lprintf(ERROR, "Map version mismatch (%hu) expected %hu", map->version, S9M_VERSION);
 		free(map);
-		fclose(file);
+		SDL_RWclose(file);
 		return NULL;
+	} else if(map->version < S9M_VERSION) {
+		// Only one version, so nothing here
 	}
 	// Flags
-	lprintf(TRACE, "map_open: flags");
-	u8 flags;
-	fread(&flags, 1, 1, file);
+	u8 flags = SDL_ReadU8(file);
 	map->upperLayer = (flags & FLAG_UPPERLAYER) ? 1 : 0;
 	map->planA = (flags & FLAG_PLANA) ? 1 : 0;
 	map->byteTiles = (flags & FLAG_BYTETILES) ? 1 : 0;
@@ -113,26 +112,40 @@ Map* map_open(const char *filename) {
 		lprintf(WARN, "Mutually exclusive options \"Enable Upper Layer\" and \"Use Plan A\"");
 	}
 	// Name
-	lprintf(TRACE, "map_open: name");
-	u8 nameLen;
-	fread(&nameLen, 1, 1, file);
+	u8 nameLen = SDL_ReadU8(file);
 	map->name = calloc(1, nameLen + 1);
-	if(nameLen > 0) fread(map->name, 1, nameLen, file);
+	if(nameLen > 0) {
+		size_t size = SDL_RWread(file, map->name, 1, nameLen);
+		if(size < nameLen) {
+			lprintf(ERROR, "Couldn't open map, unexpected EOF");
+			SDL_RWclose(file);
+			free(map->name);
+			free(map);
+			return NULL;
+		}
+	}
 	map->name[nameLen] = '\0';
 	// Width, Height
-	lprintf(TRACE, "map_open: size");
-	fread(&map->width, 2, 1, file);
-	fread(&map->height, 2, 1, file);
+	map->width = SDL_ReadLE16(file);
+	map->height = SDL_ReadLE16(file);
+	if(map->width < 20 || map->width > 999 || map->height < 14 || map->height > 999) {
+		lprintf(ERROR, "Invalid map dimensions (%hu, %hu) - must be between 20x40 and 999x999",
+			map->width, map->height);
+			SDL_RWclose(file);
+			free(map->name);
+			free(map);
+			return NULL;
+	}
 	// Total size in memory, doubled if there is an upper layer
-	lprintf(TRACE, "map_open: tiles");
 	u32 tsize = map->width * map->height * (map->upperLayer ? 2 : 1);
 	map->tiles = calloc(2, tsize);
 	// Tiles in file may be 1 or 2 bytes, in memory always 2
 	for(u32 i = 0; i < tsize; i++) {
-		fread(&map->tiles[i], 2 - map->byteTiles, 1, file);
+		map->tiles[i] = map->byteTiles ? SDL_ReadU8(file) : SDL_ReadBE16(file);
 	}
-	fclose(file);
-	lprintf(TRACE, "map_open: finish");
+	SDL_RWclose(file);
+	lprintf(INFO, "Loaded map \"%s\" (%hu, %hu) - %hx", 
+		map->name, map->width, map->height, flags);
 	return map;
 }
 

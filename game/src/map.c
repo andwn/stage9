@@ -8,7 +8,7 @@
 #define FLAG_BYTETILES	0x04
 
 // Helper macro to read a word out of a byte array
-#define BYTES_TO_WORD(x) (((x)[0]) | ((x)[1] << 8))
+#define BYTES_TO_WORD(x) (((x)[0] << 8) | ((x)[1]))
 
 u8 upperLayer, usePlanA, byteTiles;
 u8 *mapName;

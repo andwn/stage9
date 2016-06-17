@@ -80,6 +80,7 @@ int main() {
 	SYS_setVIntCallback(vblank);
 	VDP_setEnable(1);
 	SYS_enableInts();
+	//SND_startPlay_XGM(BGM_Song);
 	while(1) {
 		// Update player according to user input
 		joy = JOY_readJoypad(JOY_1);
