@@ -1,6 +1,4 @@
 ## Manual - Editor
-Here is the editor. I numbered things because other manuals do that so maybe it is useful.
-![Interface](interface.png)
 
 #### Menus
 These should work like menus in any other program.
