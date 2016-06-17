@@ -92,7 +92,7 @@ Map* map_open(const char *filename) {
 	}
 	Map *map = calloc(sizeof(Map), 1);
 	// Version
-	map->version = SDL_ReadLE16(file);
+	map->version = SDL_ReadBE16(file);
 	if(map->version > S9M_VERSION) {
 		lprintf(ERROR, "Map version mismatch (%hu) expected %hu", map->version, S9M_VERSION);
 		free(map);
@@ -126,8 +126,8 @@ Map* map_open(const char *filename) {
 	}
 	map->name[nameLen] = '\0';
 	// Width, Height
-	map->width = SDL_ReadLE16(file);
-	map->height = SDL_ReadLE16(file);
+	map->width = SDL_ReadBE16(file);
+	map->height = SDL_ReadBE16(file);
 	if(map->width < 20 || map->width > 999 || map->height < 14 || map->height > 999) {
 		lprintf(ERROR, "Invalid map dimensions (%hu, %hu) - must be between 20x40 and 999x999",
 			map->width, map->height);
