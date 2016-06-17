@@ -305,6 +305,7 @@ bool update_input() {
 		if(event.type == SDL_QUIT) {
 			return true;
 		} else if(event.type == SDL_MOUSEWHEEL) {
+			if(tsTexture == NULL) continue;
 			int dir = event.wheel.direction == SDL_MOUSEWHEEL_NORMAL ? 1 : -1;
 			int tsAdjustedHeight = tsWidth * tsHeight / (TILESET_W / TILE_SIZE);
 			tsScrollY += event.wheel.y * 2 * dir;
@@ -343,19 +344,15 @@ void update_submenu() {
 		menuy = TOOLBAR_Y + TOOLBAR_H,
 		menuw = MENUITEM_W,
 		menuh = MENUITEM_H * menuItemCount[menuOpen];
+	menuHover = menuOpen;
 	mlock = LOCK_TOOLBAR;
 	if(mouse_within(menux, menuy, menux+menuw, menuy+menuh)) { // Mouse inside menu
-		menuHover = menuOpen;
 		menuSubHover = (mousey - menuy) / MENUITEM_H;
 		if(mouse_left_pressed()) {
 			do_menu_action(menuOpen, menuSubHover);
 			menuOpen = -1;
 		}
-	} else { 
-		if(mouse_within(TOOLBAR_X, TOOLBAR_Y, TOOLBAR_X+TOOLBAR_W, TOOLBAR_Y+TOOLBAR_H)) {
-			// Hovering over other menus will open their submenus
-			menuOpen = menuHover;
-		}
+	} else {
 		// Outside menu, unhighlight, close if clicked
 		menuSubHover = -1;
 		if(mouse_left_pressed()) menuOpen = -1;
