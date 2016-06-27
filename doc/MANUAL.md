@@ -2,9 +2,9 @@
 
 #### Menus
 These should work like menus in any other program.
-- Map: Actions for the Map, Properties allows changing things like name and size
-- Tileset: Load a tileset image
-- Tile Attributes: Controls for an attribute file (stuff like passability and draw order)
+ - Map: Actions for the Map, Properties allows changing things like name and size
+ - Tileset: Load a tileset image
+ - Tile Attributes: Controls for an attribute file (stuff like passability and draw order)
 
 #### Toolbar
 There will be buttons next to the menu that do things someday
@@ -31,9 +31,12 @@ Add a PALETTE and TILESET line for your tileset, and BIN for your map.
 Modify game/src/main.c, at the start of main() to load your tileset and map.
 Note that tilesets must be exactly 128 pixels wide to display correctly.
 
-#### TODO List
-- [ ] Actually make tile attributes do something
-- [ ] Placement modes: Pencil, Box, Flood fill
-- [ ] Selection tool: Cut, Copy, Paste
-- [ ] Undo
+## File Format Specs
+ - Tile Map: [S9M Format](S9M_SPEC.md)
+ - Tile Attributes: [S9A Format](S9A_SPEC.md)
 
+#### TODO List
+ - [ ] Actually make tile attributes do something
+ - [ ] Placement modes: Pencil, Box, Flood fill
+ - [ ] Selection tool: Cut, Copy, Paste
+ - [ ] Undo
