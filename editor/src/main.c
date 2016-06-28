@@ -117,9 +117,10 @@ u8 menuGlow[MENU_COUNT] = { 0, 0, 0, 0 };
 u8 subMenuGlow[MENU_MAXITEMCOUNT] = { 0, 0, 0, 0, 0, 0 };
 
 // Buttons
-#define BUTTON_COUNT 2
-const char buttonText[BUTTON_COUNT][MENU_MAXLABELSIZE] = { "Lower", "Upper" };
-u8 buttonGlow[BUTTON_COUNT] = { 0, 0 };
+#define BUTTON_COUNT 7
+const char buttonText[BUTTON_COUNT][MENU_MAXLABELSIZE] = { 
+	"Lower", "Upper", "None", "Inward Solid", "Outward Solid", "Priority", "Terrain" };
+u8 buttonGlow[BUTTON_COUNT] = { 0, 0, 0, 0, 0, 0, 0 };
 
 // Input
 #define MLEFT 	SDL_BUTTON_LEFT
@@ -150,7 +151,7 @@ int tsWidth = 0, tsHeight = 0;
 
 // Tile Attributes
 char *attrFilename = NULL;
-u8 *attr = NULL;
+u16 *attr = NULL;
 
 // Map
 char *mapFilename = NULL;
@@ -164,6 +165,39 @@ int tsSelected = 0, tsHover = -1;
 int menuHover = -1, menuOpen = -1, menuSubHover = -1;
 int buttonHover = -1;
 bool upperSelected = false;
+int attrView = 0;
+
+u16* attr_load(const char *filename) {
+	SDL_RWops *file = SDL_RWFromFile(filename, "rb");
+	if(file == NULL) {
+		lprintf(ERROR, "Unable to open file: %s", filename);
+		return NULL;
+	}
+	u16 fileVer;
+	u16 fileFlags;
+	u16 fileCount;
+	u16 *fileAttr;
+	// Version
+	fileVer = SDL_ReadBE16(file);
+	if(fileVer > 1) {
+		lprintf(ERROR, "Attribute version mismatch (%hu) expected %hu", fileVer, 1);
+		SDL_RWclose(file);
+		return NULL;
+	} else if(fileVer < 1) {
+		// Only one version, so nothing here
+	}
+	// Flags
+	fileFlags = SDL_ReadBE16(file);
+	// Tile Count
+	fileCount = SDL_ReadBE16(file);
+	// Tiles
+	fileAttr = calloc(fileCount, 2);
+	for(u32 i = 0; i < fileCount; i++) {
+		fileAttr[i] = SDL_ReadBE16(file);
+	}
+	SDL_RWclose(file);
+	return fileAttr;
+}
 
 // Nested switch statements aren't very organized but whatever
 // Some cases are given blocks because variables
@@ -173,12 +207,11 @@ void do_menu_action(int menuIndex, int item) {
 		switch(item) {
 			case MENU_MAP_NEW: {
 				// Create a new map dialog (NULL means new map)
-				MapDialogResult *result = dialog_map_edit(NULL);
+				MapDialogResult *r = dialog_map_edit(NULL);
 				// And create a map if it wasn't cancelled
-				if(!result->cancelled) {
-					Map *newMap = map_create(result->name, result->width, result->height,
-						result->upperLayer, result->planA, result->byteTiles,
-						result->wrapH, result->wrapV);
+				if(!r->cancelled) {
+					Map *newMap = map_create(r->name, r->width, r->height,
+						r->upperLayer, r->planA, r->byteTiles, r->wrapH, r->wrapV);
 					if(newMap != NULL) {
 						// There might be a map already loaded so clean it up first
 						if(map != NULL) map_free(map);
@@ -189,7 +222,7 @@ void do_menu_action(int menuIndex, int item) {
 						}
 					}
 				}
-				free(result);
+				free(r);
 				break;
 			}
 			case MENU_MAP_OPEN: {
@@ -240,7 +273,7 @@ void do_menu_action(int menuIndex, int item) {
 				free(result);
 			}
 			break;
-			case MENU_MAP_CLOSE:
+			case MENU_MAP_CLOSE: // Free all the map stuff
 			if(map != NULL) map_free(map);
 			map = NULL;
 			if(mapFilename != NULL) free(mapFilename);
@@ -256,24 +289,46 @@ void do_menu_action(int menuIndex, int item) {
 					if(tsTexture != NULL) SDL_DestroyTexture(tsTexture);
 					tsTexture = graphics_load_texture(newFilename, true);
 					if(tsTexture != NULL) {
+						// Determine width & height in tiles
 						SDL_QueryTexture(tsTexture, NULL, NULL, &tsWidth, &tsHeight);
 						tsWidth /= TILE_SIZE;
 						tsHeight /= TILE_SIZE;
-						// Make another copy of the string to keep the GTK stuff separate
 						if(tsFilename != NULL) free(tsFilename);
 						tsFilename = newFilename;
+						if(attr == NULL) attr = calloc(tsWidth * tsHeight, 2);
 					}
 				}
 			}
 			break;
-			case MENU_TSET_CLOSE:
+			case MENU_TSET_CLOSE: // Delete texture if loaded
 			if(tsTexture != NULL) SDL_DestroyTexture(tsTexture);
 			tsTexture = NULL;
 			break;
 		}
 		break;
-		case MENU_ATTR: break;
-		case MENU_HELP: 
+		case MENU_ATTR: 
+		switch(item) {
+			case MENU_ATTR_OPEN: {
+				char *newFilename = dialog_tileattr_open();
+				if(newFilename != NULL) {
+					u16 *newAttr = attr_load(newFilename);
+					if(newAttr != NULL) {
+						if(attr != NULL) free(attr);
+						attr = newAttr;
+						if(attrFilename != NULL) free(attrFilename);
+						attrFilename = newFilename;
+					}
+				}
+			}
+			break;
+			case MENU_ATTR_SAVE:
+			
+			case MENU_ATTR_SAVEAS:
+			
+			break;
+		}
+		break;
+		case MENU_HELP: // I need help
 		switch(item) {
 			case MENU_HELP_MANUAL:
 			#ifdef _WIN32
@@ -421,6 +476,8 @@ void update_buttons() {
 			upperSelected = 0;
 		} else if(buttonHover == 1) {
 			upperSelected = 1;
+		} else if(buttonHover > 1) {
+			attrView = buttonHover - 2;
 		}
 	}
 }
@@ -556,6 +613,18 @@ void draw_buttons() {
 			if(buttonHover == i || upperSelected == i) buttonGlow[i] = 20;
 			SDL_SetRenderDrawColor(renderer, 0x60 + buttonGlow[i] * 2, 
 				0x40 + buttonGlow[i], 0x80 + buttonGlow[i], 0xFF);
+			fill_rect(x, y, BUTTON_W, BUTTON_H);
+			graphics_draw_text(buttonText[i], x + 4, y + 4, COLOR_WHITE);
+			SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+			x += BUTTON_W + BORDER_SIZE;
+		}
+	}
+	if(attr != NULL) {
+		for(int i = 2; i < 7; i++) {
+			if(buttonGlow[i] > 0) buttonGlow[i]--;
+			if(buttonHover == i || attrView == i - 2) buttonGlow[i] = 20;
+			SDL_SetRenderDrawColor(renderer, 0x80 + buttonGlow[i], 
+				0x40 + buttonGlow[i] * 2, 0x60 + buttonGlow[i], 0xFF);
 			fill_rect(x, y, BUTTON_W, BUTTON_H);
 			graphics_draw_text(buttonText[i], x + 4, y + 4, COLOR_WHITE);
 			SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
