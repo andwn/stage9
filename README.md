@@ -35,6 +35,7 @@ These will be in [Releases](https://github.com/andwn/stage9/releases) once I get
 
 #### Building (OSX)
 - Editor:
+
 1. Get the dependencies `sdl2` `sdl2_image` and `gtk2`
 2. From the `editor` directory type `make`
 
