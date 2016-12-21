@@ -34,7 +34,15 @@ These will be in [Releases](https://github.com/andwn/stage9/releases) once I get
 2. From the `game` directory type `make`
 
 #### Building (OSX)
-- I know nothing about Macs so somebody is going to have to figure this out for me
+- Editor:
+
+1. Get the dependencies `sdl2` `sdl2_image` and `gtk+`
+2. From the `editor` directory type `make`
+
+- Game:
+
+1. Install [Gendev](https://github.com/kubilus1/gendev.git)
+2. From the `game` directory type `make`
 
 #### License
 - Editor: GPLv3 or later
