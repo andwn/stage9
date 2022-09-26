@@ -1,3 +1,9 @@
+## Ded
+It's been 6 years since I touched this and don't plan on working on it again. Look into using one of these instead:
+
+- [SGDK](https://github.com/Stephane-D/SGDK) has added [Tiled support](https://github.com/mapeditor/tiled)
+- [Beehive](https://github.com/BigEvilCorporation/Beehive)
+
 # Stage9
 A level editor and renderer for Genesis/MegaDrive. 
 The editor interface aims to be cross platform using SDL2 and GTK2.
